@@ -1,4 +1,7 @@
-# MCP Kali 1.0.0
+# MCP Kali 1.1.0
+
+[![CI](https://github.com/dariohy/mpc-kali/actions/workflows/ci.yml/badge.svg)](https://github.com/dariohy/mpc-kali/actions/workflows/ci.yml)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
 
 MCP Kali is a Rust client/server system for scheduling Kali Linux security tools
 without making an MCP agent wait for a long-running process. The server owns a
@@ -7,6 +10,10 @@ webhooks, and browser dashboard. The small stdio client exposes those functions
 to an MCP host and returns job IDs immediately.
 
 Use MCP Kali only on systems and targets you are explicitly authorized to test.
+
+**Project status:** `v1.1.0` is the current stable release. The immutable
+[`v1.0.0`](https://github.com/dariohy/mpc-kali/tree/v1.0.0) tag remains
+available as the first public release line.
 
 ## Contents
 
@@ -49,7 +56,7 @@ notice and licensing details.
 
 ## Requirements
 
-- Rust 1.85 or newer to build; edition 2024 is used.
+- Rust 1.86 or newer to build; edition 2024 is used.
 - Linux or another Unix-like server for pause/resume/kill process-group control.
 - Kali tools required by the MCP methods you intend to call, such as `nmap`,
   `gobuster`, `dirb`, `nikto`, `sqlmap`, `msfconsole`, `hydra`, `john`, `wpscan`,
@@ -317,6 +324,9 @@ development builds.
 - [Release history](CHANGELOG.md)
 - [Security policy](SECURITY.md)
 - [Contributing guide](CONTRIBUTING.md)
+- [Support guide](SUPPORT.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+- [Publishing and release guide](docs/PUBLISHING.md)
 - [Example environment file](examples/.env_mcp-kali.example)
 
 ## License and upstream attribution

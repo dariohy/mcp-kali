@@ -1,0 +1,26 @@
+name: Feature request
+description: Propose a scoped improvement to MCP Kali.
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What authorized workflow or operational problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the user-visible behavior and any compatibility impact.
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security considerations
+      description: Note effects on authentication, secrets, command execution, output trust, or evidence retention.
+    validations:
+      required: true

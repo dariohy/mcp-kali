@@ -4,6 +4,7 @@
 
 | Version | Supported |
 |---|---:|
+| 1.1.x | Yes |
 | 1.0.x | Yes |
 | Pre-1.0 development snapshots | No |
 
@@ -11,8 +12,9 @@
 
 Do not open a public issue containing exploit details, credentials, customer
 data, or pentest evidence. Use GitHub's private security-advisory feature for
-[`dariohy/mpc-kali`](https://github.com/dariohy/mpc-kali) when available, or contact the repository owner through a
-previously established private channel.
+[`dariohy/mpc-kali`](https://github.com/dariohy/mpc-kali/security/advisories/new)
+when available, or contact the repository owner through a previously
+established private channel.
 
 Include:
 
@@ -28,7 +30,7 @@ output. Maintainers should acknowledge reports privately, reproduce them in an
 isolated environment, assess affected versions, and coordinate remediation and
 disclosure.
 
-## Version 1.0.0 security boundary
+## Version 1.x security boundary
 
 - MCP Kali is an authorized-testing tool and an API-accessible command runner.
 - The HTTP server has no built-in authentication or TLS. It defaults to

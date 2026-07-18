@@ -205,7 +205,8 @@ records never serialize private argv.
 
 Version 1.0.0 adds:
 
-- Rust 1.85 minimum-version metadata;
+- Rust 1.85 minimum-version metadata (the locked dependency graph requires
+  Rust 1.86; the declared minimum is corrected in version 1.1.0);
 - size-focused release profile;
 - hidden Bash/Zsh/Fish/PowerShell/Elvish completions;
 - `make verify`, `security`, `checksum`, `sbom`, and `completions`;

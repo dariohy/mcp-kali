@@ -85,7 +85,8 @@ security: check clippy test
 
 sbom:
 	mkdir -p "$(SECURITY_DIR)"
-	cargo cyclonedx --format json --output-cdx "$(SECURITY_DIR)/mcp-kali-$(VERSION).cdx.json"
+	cargo cyclonedx --format json --override-filename "mcp-kali-$(VERSION).cdx"
+	mv "mcp-kali-$(VERSION).cdx.json" "$(SECURITY_DIR)/mcp-kali-$(VERSION).cdx.json"
 
 clean:
 	$(CARGO) clean

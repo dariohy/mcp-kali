@@ -7,6 +7,23 @@ All notable changes to MCP Kali are documented here. The project follows
 
 No changes yet.
 
+## [1.1.0] - 2026-07-18
+
+### Added
+
+- GitHub Actions CI for formatting, compile checks, strict Clippy, tests, and
+  release builds on Linux.
+- Dependabot configuration for Cargo and GitHub Actions dependencies.
+- Public issue forms, pull-request guidance, support instructions, a code of
+  conduct, and a first-time publishing checklist.
+
+### Changed
+
+- Updated Cargo package metadata and public documentation to use the canonical
+  `dariohy/mpc-kali` repository URL.
+- Corrected the minimum supported Rust version to 1.86, matching the locked
+  dependency graph used by CI and release builds.
+
 ## [1.0.0] - 2026-07-18
 
 ### Added
@@ -66,6 +83,9 @@ No changes yet.
 
 ### Known limitations
 
+- The 1.0.0 package metadata states Rust 1.85, but its locked transitive
+  dependencies require Rust 1.86. Use Rust 1.86 or newer to build 1.0.0. The
+  declared minimum is corrected in version 1.1.0.
 - The HTTP server has no built-in authentication. Version 1.0.0 defaults to
   loopback and requires explicit acknowledgement for remote binding; use an SSH
   tunnel or an authenticated TLS reverse proxy.
@@ -73,5 +93,6 @@ No changes yet.
 - There is no automatic job-retention policy; operators must manage the private
   state directory according to their evidence-retention requirements.
 
-[Unreleased]: https://github.com/dariohy/mpc-kali/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/dariohy/mpc-kali/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/dariohy/mpc-kali/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dariohy/mpc-kali/releases/tag/v1.0.0

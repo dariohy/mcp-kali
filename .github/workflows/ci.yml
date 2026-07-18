@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "1.1.0"]
+  pull_request:
+    branches: [main, "1.1.0"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Rust verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install minimum supported Rust
+        run: rustup toolchain install 1.86.0 --profile minimal --component rustfmt,clippy
+
+      - name: Verify formatting
+        run: cargo +1.86.0 fmt --all -- --check
+
+      - name: Compile all targets
+        run: cargo +1.86.0 check --all-targets --all-features --locked
+
+      - name: Run Clippy
+        run: cargo +1.86.0 clippy --all-targets --all-features --locked -- -D warnings
+
+      - name: Run tests
+        run: cargo +1.86.0 test --all-features --locked
+
+      - name: Build release binaries
+        run: cargo +1.86.0 build --release --locked

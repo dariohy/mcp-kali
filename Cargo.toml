@@ -1,12 +1,12 @@
 [package]
 name = "mcp-kali"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.86"
 description = "Client and server for asynchronous Kali tool scheduling over MCP"
 license = "GPL-3.0-or-later"
 readme = "README.md"
-repository = "https://github.com/dariohy/my-mcp"
+repository = "https://github.com/dariohy/mpc-kali"
 keywords = ["kali", "mcp", "pentesting", "scheduler", "security"]
 categories = ["command-line-utilities", "development-tools"]
 

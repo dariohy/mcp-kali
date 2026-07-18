@@ -3,9 +3,21 @@
 MCP Kali accepts scoped changes that preserve its asynchronous job model,
 machine-readable MCP stdout, and security boundaries.
 
+By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Branch and version policy
+
+- `main` represents the latest stable release.
+- `v1.0.0` and `v1.1.0` are immutable release history and must not be moved or
+  rewritten.
+- Open pull requests against `main` unless a maintainer announces a dedicated
+  development or maintenance branch.
+- Change `Cargo.toml` only while preparing a release. Do not use a future stable
+  version merely to identify a development branch.
+
 ## Development setup
 
-Requirements: Rust 1.85+, Cargo, and Make.
+Requirements: Rust 1.86+, Cargo, and Make.
 
 ```bash
 cargo build
@@ -70,3 +82,5 @@ If an optional tool is not installed, state that in the handoff. Do not weaken
 - Confirm ignored env, job, log, and `target/` artifacts remain unstaged.
 - Use a clear commit message.
 - Push, tag, sign, or publish only when explicitly authorized.
+
+See [docs/PUBLISHING.md](docs/PUBLISHING.md) for the maintainer release process.
