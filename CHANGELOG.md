@@ -5,6 +5,8 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-07-18
+
 ### Added
 
 - Declarative YAML Plugin discovery with layered packaged and administrator
@@ -33,7 +35,7 @@ All notable changes to MCP Kali are documented here. The project follows
   selectors.
 - Moved the shipped Capability Catalog into the Plugin data directory and made
   per-user paths the runtime defaults.
-- Set the unreleased development version to 2.0.0.
+- Set the release version to 2.0.0.
 - Replaced hard-coded scanner and command submission routes with generic Plugin
   discovery and `POST /api/tools/{tool_name}/invoke`.
 - Made the MCP bridge retrieve tool definitions from the server at `tools/list`.
@@ -135,6 +137,7 @@ All notable changes to MCP Kali are documented here. The project follows
 - There is no automatic job-retention policy; operators must manage the private
   state directory according to their evidence-retention requirements.
 
-[Unreleased]: https://github.com/dariohy/mcp-kali/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/dariohy/mcp-kali/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/dariohy/mcp-kali/releases/tag/v2.0.0
 [1.1.0]: https://github.com/dariohy/mcp-kali/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dariohy/mcp-kali/releases/tag/v1.0.0

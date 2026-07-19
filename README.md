@@ -11,8 +11,7 @@ to an MCP host and returns job IDs immediately.
 
 Use MCP Kali only on systems and targets you are explicitly authorized to test.
 
-**Project status:** `2.0.0` is the current unreleased development line;
-`v1.1.0` remains the current stable release.
+**Project status:** `v2.0.0` is the current stable release.
 
 ## Contents
 
