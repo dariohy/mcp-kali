@@ -21,8 +21,8 @@ MCP_KALI_GROUP ?= $(MCP_KALI_USER)
 SYSTEM_CONFIG_FILE := $(SYSTEM_CONFIG_DIR)/mcp-kali.conf
 SYSTEM_UNIT_FILE := $(SYSTEMD_UNIT_DIR)/mcp-kali.service
 
-.PHONY: help fmt fmt-check check clippy test build release verify run-server run-client \
-	completions install-local checksum security sbom clean \
+.PHONY: help fmt fmt-check check clippy test build client release verify run-server run-client \
+	completions client-install install-local checksum security sbom clean \
 	install install-system systemd-reload enable-system disable-system status-system logs-system
 
 help:
@@ -33,11 +33,13 @@ help:
 	@echo "  clippy        Run strict Clippy checks"
 	@echo "  test          Run the full test suite"
 	@echo "  build         Build debug binaries"
+	@echo "  client        Build only the debug MCP bridge binary"
 	@echo "  release       Build size-optimized release binaries"
 	@echo "  verify        Run fmt, check, clippy, test, and release"
 	@echo "  run-server    Run a local development server"
 	@echo "  run-client    Run the stdio MCP client"
 	@echo "  completions   Generate completion scripts for both binaries"
+	@echo "  client-install Build and locally install only mcp-kali-bridge"
 	@echo "  install       Install locally as a user, or system-wide as root"
 	@echo "  install-local Create a self-contained per-user installation under ~/.mcp-kali"
 	@echo "  install-system Install binaries, data, config template, and systemd unit (root; existing service user required)"
@@ -69,6 +71,9 @@ test:
 build:
 	$(CARGO) build
 
+client:
+	$(CARGO) build --bin $(CLIENT_BIN)
+
 release:
 	$(CARGO) build --release
 
@@ -92,6 +97,16 @@ completions: release
 	target/release/$(CLIENT_BIN) completions fish > "$(COMPLETION_DIR)/$(CLIENT_BIN).fish"
 	target/release/$(CLIENT_BIN) completions powershell > "$(COMPLETION_DIR)/$(CLIENT_BIN).ps1"
 	target/release/$(CLIENT_BIN) completions elvish > "$(COMPLETION_DIR)/$(CLIENT_BIN).elv"
+
+client-install:
+	@test "$$(id -u)" -ne 0 || { echo "client-install is for a non-root user" >&2; exit 2; }
+	$(CARGO) build --release --bin $(CLIENT_BIN)
+	mkdir -p "$(INSTALL_DIR)" "$(LOCAL_BIN_DIR)"
+	@if [ -e "$(LOCAL_BIN_DIR)/$(CLIENT_BIN)" ] && [ ! -L "$(LOCAL_BIN_DIR)/$(CLIENT_BIN)" ]; then \
+		echo "refusing to replace non-symlink $(LOCAL_BIN_DIR)/$(CLIENT_BIN)" >&2; exit 2; \
+	fi
+	install -m 0755 "target/release/$(CLIENT_BIN)" "$(INSTALL_DIR)/$(CLIENT_BIN)"
+	ln -sfn "$(abspath $(INSTALL_DIR))/$(CLIENT_BIN)" "$(LOCAL_BIN_DIR)/$(CLIENT_BIN)"
 
 install-local: release
 	@test "$$(id -u)" -ne 0 || { echo "install-local is for a non-root user; use make install MCP_KALI_USER=<authorized-user> as root" >&2; exit 2; }

@@ -166,6 +166,16 @@ stack unwinding in the release binaries.
 
 ### Local user installation
 
+For a client-only MCP host, install just the bridge:
+
+```bash
+make client-install
+```
+
+This builds and installs `mcp-kali-bridge` under `~/.mcp-kali/bin` and creates
+its `~/.local/bin` symlink. It does not create server configuration, Plugin
+data, or job state.
+
 ```bash
 make install
 ```

@@ -5,6 +5,8 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-07-19
+
 ### Added
 
 - Declarative tool-level `requirements.privilege: root`, with default
@@ -21,6 +23,8 @@ All notable changes to MCP Kali are documented here. The project follows
   respective `etc/plugins` configuration trees.
 - Moved the repository's packaged Plugin manifests and Capability Catalog to
   the top-level `plugins/` directory.
+- Added focused `make client` and `make client-install` workflows for building
+  and locally installing only `mcp-kali-bridge`.
 
 ### Changed
 

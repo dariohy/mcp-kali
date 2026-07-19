@@ -91,6 +91,15 @@ target/release/mcp-kali-bridge
 └── var/jobs/                    # private durable job state and output
 ```
 
+If the MCP host needs only the bridge, use the smaller local installation:
+
+```bash
+make client-install
+```
+
+It builds and installs only `mcp-kali-bridge` plus its `~/.local/bin` symlink;
+it does not create server configuration, Plugin data, or job state.
+
 Install it with:
 
 ```bash
