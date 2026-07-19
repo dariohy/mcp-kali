@@ -1,8 +1,15 @@
 use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
-use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWriteExt, BufReader};
+use std::{sync::Arc, time::Duration};
+use tokio::{
+    io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader},
+    sync::Mutex,
+};
 
 const MAX_MCP_REQUEST_BYTES: usize = 1024 * 1024;
+const TOOL_LIST_POLL_INTERVAL: Duration = Duration::from_secs(5);
+
+type SharedOutput = Arc<Mutex<tokio::io::Stdout>>;
 
 enum InputLine {
     Line(Vec<u8>),
@@ -13,12 +20,13 @@ enum InputLine {
 pub async fn run(server: reqwest::Url) -> Result<()> {
     let client = reqwest::Client::new();
     let mut input = BufReader::new(tokio::io::stdin());
-    let mut output = tokio::io::stdout();
+    let output = Arc::new(Mutex::new(tokio::io::stdout()));
+    let mut tool_watcher = None;
     loop {
         let line = match read_bounded_line(&mut input, MAX_MCP_REQUEST_BYTES).await? {
             InputLine::Line(line) => line,
             InputLine::TooLong => {
-                write(&mut output, &json!({"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":format!("request exceeds {MAX_MCP_REQUEST_BYTES} bytes")}})).await?;
+                write_shared(&output, &json!({"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":format!("request exceeds {MAX_MCP_REQUEST_BYTES} bytes")}})).await?;
                 continue;
             }
             InputLine::Eof => break,
@@ -29,24 +37,31 @@ pub async fn run(server: reqwest::Url) -> Result<()> {
         let request: Value = match serde_json::from_slice(&line) {
             Ok(value) => value,
             Err(error) => {
-                write(&mut output, &json!({"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":error.to_string()}})).await?;
+                write_shared(&output, &json!({"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":error.to_string()}})).await?;
                 continue;
             }
         };
+        if request.get("method").and_then(Value::as_str) == Some("notifications/initialized") {
+            if tool_watcher.is_none() {
+                tool_watcher = Some(tokio::spawn(watch_tool_list(
+                    client.clone(),
+                    server.clone(),
+                    Arc::clone(&output),
+                )));
+            }
+            continue;
+        }
         let Some(id) = request.get("id").cloned() else {
             continue;
         };
         let response = match request.get("method").and_then(Value::as_str).unwrap_or("") {
-            "initialize" => json!({
-                "jsonrpc":"2.0",
-                "id":id,
-                "result":{
-                    "protocolVersion":request.pointer("/params/protocolVersion").cloned().unwrap_or(json!("2025-06-18")),
-                    "capabilities":{"tools":{"listChanged":false}},
-                    "serverInfo":{"name":"mcp-kali","version":env!("CARGO_PKG_VERSION")},
-                    "instructions":AGENT_SAFETY
-                }
-            }),
+            "initialize" => initialize_response(
+                id,
+                request
+                    .pointer("/params/protocolVersion")
+                    .cloned()
+                    .unwrap_or(json!("2025-06-18")),
+            ),
             "ping" => json!({"jsonrpc":"2.0","id":id,"result":{}}),
             "tools/list" => match fetch_tools(&client, &server).await {
                 Ok(tools) => json!({"jsonrpc":"2.0","id":id,"result":{"tools":tools}}),
@@ -64,9 +79,55 @@ pub async fn run(server: reqwest::Url) -> Result<()> {
                 json!({"jsonrpc":"2.0","id":id,"error":{"code":-32601,"message":format!("method not found: {method}")}})
             }
         };
-        write(&mut output, &response).await?;
+        write_shared(&output, &response).await?;
+    }
+    if let Some(watcher) = tool_watcher {
+        watcher.abort();
     }
     Ok(())
+}
+
+fn initialize_response(id: Value, protocol_version: Value) -> Value {
+    json!({
+        "jsonrpc":"2.0",
+        "id":id,
+        "result":{
+            "protocolVersion":protocol_version,
+            "capabilities":{"tools":{"listChanged":true}},
+            "serverInfo":{"name":"mcp-kali","version":env!("CARGO_PKG_VERSION")},
+            "instructions":AGENT_SAFETY
+        }
+    })
+}
+
+async fn watch_tool_list(client: reqwest::Client, server: reqwest::Url, output: SharedOutput) {
+    let mut previous = fetch_tools(&client, &server).await.ok();
+    let mut interval = tokio::time::interval(TOOL_LIST_POLL_INTERVAL);
+    interval.tick().await;
+    loop {
+        interval.tick().await;
+        let Ok(current) = fetch_tools(&client, &server).await else {
+            previous = None;
+            continue;
+        };
+        let changed = update_tool_snapshot(&mut previous, current);
+        if changed {
+            if let Err(error) = write_shared(&output, &tool_list_changed_notification()).await {
+                tracing::debug!(%error, "could not send tool-list change notification");
+                return;
+            }
+        }
+    }
+}
+
+fn tool_list_changed_notification() -> Value {
+    json!({"jsonrpc":"2.0","method":"notifications/tools/list_changed"})
+}
+
+fn update_tool_snapshot(previous: &mut Option<Vec<Value>>, current: Vec<Value>) -> bool {
+    let changed = previous.as_ref().is_none_or(|tools| tools != &current);
+    *previous = Some(current);
+    changed
 }
 
 async fn read_bounded_line<R: AsyncBufRead + Unpin>(
@@ -216,7 +277,12 @@ fn untrusted_data(data: Value) -> Value {
     })
 }
 
-async fn write(output: &mut tokio::io::Stdout, value: &Value) -> Result<()> {
+async fn write_shared(output: &SharedOutput, value: &Value) -> Result<()> {
+    let mut output = output.lock().await;
+    write(&mut *output, value).await
+}
+
+async fn write<W: AsyncWrite + Unpin>(output: &mut W, value: &Value) -> Result<()> {
     output
         .write_all(serde_json::to_string(value)?.as_bytes())
         .await?;
@@ -261,6 +327,43 @@ mod tests {
             result.pointer("/structuredContent/security_classification"),
             Some(&json!("untrusted_job_execution_data"))
         );
+    }
+
+    #[test]
+    fn initializes_with_tool_list_change_support() {
+        let response = initialize_response(json!(1), json!("2025-06-18"));
+        assert_eq!(
+            response.pointer("/result/capabilities/tools/listChanged"),
+            Some(&json!(true))
+        );
+    }
+
+    #[test]
+    fn tool_list_change_notification_has_no_id() {
+        let notification = tool_list_changed_notification();
+        assert_eq!(
+            notification,
+            json!({"jsonrpc":"2.0","method":"notifications/tools/list_changed"})
+        );
+    }
+
+    #[test]
+    fn tool_snapshot_changes_only_when_the_projection_differs() {
+        let original = vec![json!({"name":"nmap_host_discovery"})];
+        let mut snapshot = Some(original.clone());
+        assert!(!update_tool_snapshot(&mut snapshot, original));
+        assert!(update_tool_snapshot(
+            &mut snapshot,
+            vec![
+                json!({"name":"nmap_host_discovery"}),
+                json!({"name":"nikto_web_scan"})
+            ]
+        ));
+        snapshot = None;
+        assert!(update_tool_snapshot(
+            &mut snapshot,
+            vec![json!({"name":"nmap_host_discovery"})]
+        ));
     }
 
     #[tokio::test]

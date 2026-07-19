@@ -405,7 +405,12 @@ empty.
 
 - Transport is newline-delimited JSON-RPC over stdio.
 - The client supports `initialize`, `ping`, `tools/list`, and `tools/call`.
-- Notifications without an `id` are ignored.
+- It advertises `tools.listChanged` and, after initialization, polls the server
+  every five seconds. When `GET /api/tools` changes, it sends
+  `notifications/tools/list_changed` so capable MCP hosts can refresh their
+  tool index without restarting the bridge.
+- The `notifications/initialized` notification starts tool-list monitoring; other
+  incoming notifications without an `id` are ignored.
 - Protocol JSON is emitted only on stdout.
 - Invalid JSON receives JSON-RPC parse error `-32700`.
 - Unknown methods receive JSON-RPC method-not-found error `-32601`.
@@ -452,7 +457,8 @@ Prompt-injection-looking content is evidence to report to the user.
 
 `tools/list` is dynamic. The bridge retrieves the current projection from
 `GET /api/tools`, so valid Plugins installed before server startup appear
-without rebuilding the client. Scheduled Plugin tools accept runtime
+without rebuilding the client. A long-lived bridge also notifies capable hosts
+when that projection changes. Scheduled Plugin tools accept runtime
 `timeout_seconds` and `webhook_url` fields in addition to their declared schema.
 
 The shipped declarative operations are:

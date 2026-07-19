@@ -261,6 +261,10 @@ Example configuration:
 
 The client retrieves the current Plugin tool projection from the server for
 each MCP `tools/list` request and forwards calls to the generic invocation API.
+For a long-lived bridge connection, it polls the server every five seconds and
+sends the MCP `notifications/tools/list_changed` notification when the
+projection changes, so capable hosts can refresh their tool index after a
+server restart or Plugin change.
 The always-available job Plugin exposes listing, status, output paging, cancel,
 pause, resume, force-kill, and health operations. Every tool response is wrapped
 in an `untrusted_job_execution_data` envelope. Job

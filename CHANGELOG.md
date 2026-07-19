@@ -17,6 +17,8 @@ All notable changes to MCP Kali are documented here. The project follows
   Hydra, John the Ripper, WPScan, and enum4linux.
 - Monitor Tools view for registered Plugins/tools, declared command
   requirements, and isolated unavailable-Plugin diagnostics.
+- MCP tool-list change notifications, so capable hosts can refresh their tool
+  index after the server's Plugin projection changes.
 
 ### Changed
 
