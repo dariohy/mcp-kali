@@ -65,9 +65,14 @@ must be a valid JSON Schema object schema.
 
 `requires.commands` and tool-level `requirements.commands` contain bare command
 names. Every declared command must be executable on the server's `PATH` at
-startup. Optional `requirements.privilege` and
-`policy.requires_explicit_enable` metadata mark the tool privileged in the
-public projection; they do not elevate the server process.
+startup. Tool-level `requirements.privilege` may be `root`. It is published in
+the MCP metadata and, with the default `MCP_KALI_PRIVILEGE_ELEVATION=auto`, the
+runtime executes that declarative tool as `sudo -n -- program args...` unless
+the server is already root. `sudo -n` never prompts; the host's sudoers policy
+decides whether the job succeeds. Set the runtime mode to `none` to leave the
+argv unchanged. Plugin-level privilege remains descriptive; declare it on each
+tool that needs elevation. `policy.requires_explicit_enable` only marks a tool
+privileged in the public projection.
 
 ## Safe argument templates
 

@@ -12,7 +12,7 @@ requires:
 tools:
   - metadata:
       name: nmap_host_discovery
-      description: Discover responsive systems in an authorized target range.
+      description: Discover responsive systems in an authorized target range using Nmap's privileged discovery probes.
     input_schema:
       type: object
       additionalProperties: false
@@ -22,6 +22,8 @@ tools:
     execution:
       program: nmap
       args: [-sn, "{{target}}"]
+    requirements:
+      privilege: root
   - metadata:
       name: nmap_service_scan
       description: Detect services and versions on an authorized target.

@@ -14,6 +14,9 @@ RUST_LOG=mcp_kali=info,tower_http=info
 # MCP_KALI_CONFIG_DIR=/home/your-user/.mcp-kali/etc
 # Disable the privileged Core Plugin execute_command tool.
 # MCP_KALI_DISABLE_EXECUTE_COMMAND=false
+# For declarative tools that declare requirements.privilege: root: auto uses
+# sudo -n unless mcp-kali already runs as root; none never adds sudo.
+MCP_KALI_PRIVILEGE_ELEVATION=auto
 MCP_KALI_MAX_CONCURRENCY=2
 MCP_KALI_DEFAULT_TIMEOUT=1800
 MCP_KALI_REVEAL_SENSITIVE_DATA=false

@@ -5,6 +5,18 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Declarative tool-level `requirements.privilege: root`, with default
+  non-interactive `sudo -n` elevation controlled by
+  `MCP_KALI_PRIVILEGE_ELEVATION=auto|none`.
+- Root requirement metadata in MCP tool projections and the Monitor Tools tab.
+
+### Changed
+
+- Marked Nmap host discovery as root-required so it uses privileged discovery
+  probes in the default runtime mode.
+
 ## [2.0.0] - 2026-07-18
 
 ### Added

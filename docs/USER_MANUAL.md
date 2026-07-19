@@ -286,9 +286,24 @@ messages. The binaries already direct tracing to stderr.
 | `MCP_KALI_SYSTEM_DATA_DIR` | `--system-data-dir` | `~/.mcp-kali/share` | Directory |
 | `MCP_KALI_CONFIG_DIR` | `--config-dir` | `~/.mcp-kali/etc` | Directory |
 | `MCP_KALI_DISABLE_EXECUTE_COMMAND` | `--disable-execute-command` | `false` | Boolean |
+| `MCP_KALI_PRIVILEGE_ELEVATION` | `--privilege-elevation` | `auto` | `auto` or `none` |
 | `MCP_KALI_ALLOW_REMOTE_BIND` | `--allow-remote-bind` | `false` | Boolean acknowledgement |
 
 Boolean env values use Clap's normal boolean parsing. Use `true` or `false`.
+
+### Declarative root requirements
+
+Plugin tools may declare `requirements.privilege: root`. In the default
+`auto` mode, mcp-kali runs such a tool directly when its effective UID is root;
+otherwise it prefixes the rendered argv with `sudo -n --`. No interactive sudo
+prompt is ever opened. If `sudo` is absent, the invocation is rejected with a
+clear error; if sudoers disallows that command, the resulting job records the
+sudo failure. Set `MCP_KALI_PRIVILEGE_ELEVATION=none` to run the declared tool
+as the server identity without adding sudo.
+
+This applies only to declarative Plugin tools. `execute_command` remains raw
+explicit argv: use `program: "sudo"` and arguments beginning `-n`, `--`, and
+the desired command when the caller needs elevation.
 
 ### Client variables and flags
 
@@ -647,7 +662,7 @@ diagnostics, and running, paused, queued, and finished jobs.
   dispatch order.
 - **Finished history:** newest terminal jobs first.
 - **Tools:** registered Plugins and tools, their declared command requirements,
-  and startup diagnostics. A missing required executable prevents only that
+  root requirements, and startup diagnostics. A missing required executable prevents only that
   Plugin from being published through MCP; the server and other Plugins
   continue running.
 

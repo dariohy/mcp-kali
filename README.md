@@ -194,6 +194,7 @@ not accept the prior `--env-file` / `MCP_KALI_ENV_FILE` selectors.
 | `MCP_KALI_SYSTEM_DATA_DIR` | Server | `~/.mcp-kali/share` | Shipped Plugins and base catalog |
 | `MCP_KALI_CONFIG_DIR` | Server | `~/.mcp-kali/etc` | Administrator Plugin/catalog overlay |
 | `MCP_KALI_DISABLE_EXECUTE_COMMAND` | Server | `false` | Remove the privileged free-execution tool |
+| `MCP_KALI_PRIVILEGE_ELEVATION` | Server | `auto` | `auto` uses `sudo -n` for declarative root-required tools unless already root; `none` runs them directly |
 | `MCP_KALI_ALLOW_REMOTE_BIND` | Server | `false` | Acknowledge an unauthenticated non-loopback bind |
 | `MCP_KALI_SERVER` | Client | `http://127.0.0.1:5000` | Server origin URL |
 | `MCP_KALI_ALLOW_INSECURE_HTTP` | Client | `false` | Permit HTTP to a non-loopback server |
@@ -238,6 +239,14 @@ Templates support only literal arguments, whole-value `{{field}}`
 substitutions, and `{when: field, args: [...]}` optional fragments. Every
 rendered value is exactly one process argument; shells, partial interpolation,
 expressions, loops, and command substitution are rejected.
+
+For a declarative tool that needs privileged probes, set its tool-level
+`requirements.privilege: root`. With the default
+`MCP_KALI_PRIVILEGE_ELEVATION=auto`, the server runs that tool directly when it
+is already root, otherwise as `sudo -n -- program args...`; it never prompts.
+`none` disables that automatic prefix. This setting does not change the Core
+`execute_command` tool: callers may explicitly invoke `sudo -n` as its program
+when needed.
 
 The separate capability catalog maps stable semantic IDs to Plugin providers.
 Catalog references remain visible with an availability flag when an optional

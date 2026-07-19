@@ -4,7 +4,7 @@ use clap_complete::{Shell, generate};
 use mcp_kali::{
     config::{default_config_dir, default_state_dir, default_system_data_dir},
     jobs::Scheduler,
-    plugins::PluginRegistry,
+    plugins::{PluginRegistry, PrivilegeElevation},
 };
 use std::{net::SocketAddr, path::PathBuf};
 use tracing_subscriber::EnvFilter;
@@ -61,6 +61,11 @@ struct Cli {
         default_value_t = false
     )]
     disable_execute_command: bool,
+
+    /// Automatically use non-interactive sudo for declarative tools that declare
+    /// requirements.privilege: root. Use none to run them as the server user.
+    #[arg(long, env = "MCP_KALI_PRIVILEGE_ELEVATION", default_value = "auto")]
+    privilege_elevation: PrivilegeElevation,
 
     /// Permit binding to a non-loopback address. The server has no built-in
     /// authentication; protect remote access with a firewall and private
@@ -125,10 +130,11 @@ async fn main() -> Result<()> {
         cli.reveal_sensitive_data,
     )
     .await?;
-    let registry = PluginRegistry::load(
+    let registry = PluginRegistry::load_with_privilege_elevation(
         &cli.system_data_dir,
         &cli.config_dir,
         !cli.disable_execute_command,
+        cli.privilege_elevation,
     );
     for diagnostic in registry.diagnostics() {
         tracing::warn!(
