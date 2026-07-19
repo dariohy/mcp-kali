@@ -97,7 +97,7 @@ pub fn default_state_dir() -> PathBuf {
 pub fn default_system_data_dir() -> PathBuf {
     default_mcp_kali_home()
         .map(|home| home.join("etc"))
-        .unwrap_or_else(|| PathBuf::from("/usr/local/share/mcp-kali"))
+        .unwrap_or_else(|| PathBuf::from("/etc/mcp-kali"))
 }
 
 pub fn default_config_dir() -> PathBuf {

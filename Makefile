@@ -75,7 +75,7 @@ release:
 verify: fmt-check check clippy test release
 
 run-server:
-	$(CARGO) run --bin $(SERVER_BIN) -- --state-dir ./var/jobs --system-data-dir ./share/mcp-kali --config-dir ./etc
+	$(CARGO) run --bin $(SERVER_BIN) -- --state-dir ./var/jobs --system-data-dir ./ --config-dir ./etc
 
 run-client:
 	$(CARGO) run --bin $(CLIENT_BIN) -- --server http://127.0.0.1:5000
@@ -112,7 +112,7 @@ install-local: release
 		link="$(LOCAL_BIN_DIR)/$$binary"; \
 		ln -sfn "$(abspath $(INSTALL_DIR))/$$binary" "$$link"; \
 	done
-	cp -R share/mcp-kali/plugins/. "$(PLUGIN_DIR)/"
+	cp -R plugins/. "$(PLUGIN_DIR)/"
 
 install:
 	@if [ "$$(id -u)" -eq 0 ]; then \
@@ -131,7 +131,7 @@ install-system: release
 	install -d -o "$(MCP_KALI_USER)" -g "$(MCP_KALI_GROUP)" -m 0700 "$(SYSTEM_STATE_DIR)"
 	install -m 0755 "target/release/$(SERVER_BIN)" "$(SYSTEM_BIN_DIR)/$(SERVER_BIN)"
 	install -m 0755 "target/release/$(CLIENT_BIN)" "$(SYSTEM_BIN_DIR)/$(CLIENT_BIN)"
-	cp -R share/mcp-kali/plugins/. "$(SYSTEM_CONFIG_DIR)/plugins/"
+	cp -R plugins/. "$(SYSTEM_CONFIG_DIR)/plugins/"
 	@test -e "$(SYSTEM_CONFIG_FILE)" || install -m 0644 "examples/mcp-kali.system.conf.example" "$(SYSTEM_CONFIG_FILE)"
 	sed -e 's|@MCP_KALI_USER@|$(MCP_KALI_USER)|g' -e 's|@MCP_KALI_GROUP@|$(MCP_KALI_GROUP)|g' -e 's|@MCP_KALI_BIN@|$(SYSTEM_BIN_DIR)/$(SERVER_BIN)|g' "systemd/mcp-kali.service.in" > "$(SYSTEM_UNIT_FILE)"
 	chmod 0644 "$(SYSTEM_UNIT_FILE)"

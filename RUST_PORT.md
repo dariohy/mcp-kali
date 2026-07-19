@@ -57,7 +57,7 @@ src/jobs.rs        durable scheduler, process groups, output files, webhooks
 src/plugins.rs     Plugin registry, catalogs, schemas, templates, core operations
 src/models.rs      stable serialized job, output, and health models
 src/dashboard.html embedded dashboard HTML/CSS/JavaScript
-share/mcp-kali/    packaged Plugin manifests and base Capability Catalog
+plugins/           packaged Plugin manifests and base Capability Catalog
 ```
 
 `Cargo.toml` is the version source of truth. Both Clap binaries, MCP

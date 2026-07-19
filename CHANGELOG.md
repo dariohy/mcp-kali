@@ -19,6 +19,8 @@ All notable changes to MCP Kali are documented here. The project follows
   root-only Makefile install/enable/status/log targets.
 - Unified user and system Plugin/catalog declaration locations under their
   respective `etc/plugins` configuration trees.
+- Moved the repository's packaged Plugin manifests and Capability Catalog to
+  the top-level `plugins/` directory.
 
 ### Changed
 

@@ -1672,7 +1672,7 @@ tools:
 
     #[test]
     fn catalog_retains_unavailable_provider_references() {
-        let system = Path::new(env!("CARGO_MANIFEST_DIR")).join("share/mcp-kali");
+        let system = Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf();
         let overlay = tempdir().unwrap();
         let registry = PluginRegistry::load(&system, overlay.path(), false);
         let execution = registry.capability("system.command_execution").unwrap();
@@ -1797,7 +1797,7 @@ execution: {program: printf, args: []}
 
     #[test]
     fn packaged_manifests_and_templates_are_structurally_valid() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("share/mcp-kali/plugins");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("plugins");
         let manifests = find_named_files(&root, "plugin.yaml");
         assert!(!manifests.is_empty());
         for path in manifests {
@@ -1810,7 +1810,7 @@ execution: {program: printf, args: []}
     }
 
     fn packaged_execution(name: &str) -> ExecutionDefinition {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("share/mcp-kali/plugins");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("plugins");
         for path in find_named_files(&root, "plugin.yaml") {
             let plugin: PluginDocument = serde_yaml::from_slice(&fs::read(path).unwrap()).unwrap();
             if let Some(tool) = plugin

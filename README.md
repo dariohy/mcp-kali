@@ -159,7 +159,7 @@ Start the server on loopback with a workspace-local state directory:
 ./target/release/mcp-kali \
   --bind 127.0.0.1:5000 \
   --state-dir ./var/jobs \
-  --system-data-dir ./share/mcp-kali \
+  --system-data-dir . \
   --max-concurrency 2 \
   --default-timeout 1800
 ```
@@ -241,6 +241,9 @@ administrator overlay from `CONFIG_DIR/plugins`. A valid overlay Plugin or tool
 with the same identity replaces the packaged definition. Discovery happens at
 startup; malformed files are isolated and reported at
 `/api/plugins/diagnostics`.
+
+In a source checkout, the packaged definitions live in `./plugins`; use the
+repository root as `SYSTEM_DATA_DIR` when running directly from source.
 
 A Plugin manifest uses `apiVersion: mcp-kali/v1`, `kind: Plugin`, identity
 metadata, optional requirements, and one or more tools. Each tool publishes a
