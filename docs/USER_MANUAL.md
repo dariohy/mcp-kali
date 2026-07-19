@@ -296,10 +296,12 @@ Boolean env values use Clap's normal boolean parsing. Use `true` or `false`.
 Plugin tools may declare `requirements.privilege: root`. In the default
 `auto` mode, mcp-kali runs such a tool directly when its effective UID is root;
 otherwise it prefixes the rendered argv with `sudo -n --`. No interactive sudo
-prompt is ever opened. If `sudo` is absent, the invocation is rejected with a
-clear error; if sudoers disallows that command, the resulting job records the
-sudo failure. Set `MCP_KALI_PRIVILEGE_ELEVATION=none` to run the declared tool
-as the server identity without adding sudo.
+prompt is ever opened. At startup, auto mode runs a non-interactive sudo probe.
+The MCP projection exposes `enabled` and `_meta.elevation` for each tool, and
+the Monitor Tools tab marks root-required tools disabled if the probe fails.
+If sudoers later disallows a particular command, its job records that failure.
+Set `MCP_KALI_PRIVILEGE_ELEVATION=none` to run the declared tool as the server
+identity without adding sudo.
 
 This applies only to declarative Plugin tools. `execute_command` remains raw
 explicit argv: use `program: "sudo"` and arguments beginning `-n`, `--`, and
@@ -353,6 +355,27 @@ mcp-kali \
 `make install-local` is deliberately non-root. A future system installation
 will require a dedicated service user and create a reviewed systemd unit. Until
 then, run the server as the authorized local user from the per-user tree.
+
+### Runtime signals
+
+On Unix, use `SIGTERM` (or `SIGINT`) for graceful shutdown. The server stops
+new submissions, marks queued work cancelled, cancels active job process groups,
+sends `SIGTERM` to active job process groups, and gives them up to 10 seconds
+to exit before sending `SIGKILL`. It persists final state before exiting. This
+is the signal a future systemd unit should use for normal stop and restart
+operations. A second `SIGTERM` or `SIGINT` skips the remainder of that grace
+period and immediately force-kills active job process groups.
+
+`SIGHUP` reloads the Plugin and capability-catalog runtime without interrupting
+existing jobs. The reload is rejected and the previous runtime remains active
+if the configuration cannot be read, its concurrency value is invalid, or the
+replacement Plugin load reports diagnostics. The MCP bridge sees the changed
+tool projection through its existing tool-list polling/notification behavior.
+
+When `MCP_KALI_MAX_CONCURRENCY` is set in the loaded configuration file,
+`SIGHUP` also applies its updated value. Increasing it dispatches queued work;
+decreasing it lets existing jobs finish and waits before starting more. An
+explicit CLI flag or inherited environment value remains fixed until restart.
 
 ### Remote client through SSH
 

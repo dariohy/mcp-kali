@@ -11,6 +11,10 @@ All notable changes to MCP Kali are documented here. The project follows
   non-interactive `sudo -n` elevation controlled by
   `MCP_KALI_PRIVILEGE_ELEVATION=auto|none`.
 - Root requirement metadata in MCP tool projections and the Monitor Tools tab.
+- Startup non-interactive sudo readiness checks, with MCP and Monitor status for
+  whether each root-required tool is enabled.
+- Unix `SIGTERM`/`SIGINT` graceful shutdown and `SIGHUP` atomic Plugin/catalog
+  reload, including configuration-file scheduler-concurrency reload.
 
 ### Changed
 

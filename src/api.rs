@@ -15,24 +15,27 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
+use tokio::sync::RwLock;
 use tokio_util::io::ReaderStream;
+use tokio_util::sync::CancellationToken;
 use tower_http::trace::TraceLayer;
 use uuid::Uuid;
 
 #[derive(Clone)]
 struct AppState {
     scheduler: Scheduler,
-    registry: Arc<PluginRegistry>,
+    registry: Arc<RwLock<PluginRegistry>>,
 }
 
 pub async fn serve(
     address: SocketAddr,
     scheduler: Scheduler,
-    registry: PluginRegistry,
+    registry: Arc<RwLock<PluginRegistry>>,
+    shutdown: CancellationToken,
 ) -> AnyResult<()> {
     let state = AppState {
         scheduler,
-        registry: Arc::new(registry),
+        registry,
     };
     let app = Router::new()
         .route("/", get(index))
@@ -63,13 +66,9 @@ pub async fn serve(
     let listener = tokio::net::TcpListener::bind(address).await?;
     tracing::info!(%address, "HTTP server listening");
     axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown())
+        .with_graceful_shutdown(shutdown.cancelled_owned())
         .await?;
     Ok(())
-}
-
-async fn shutdown() {
-    let _ = tokio::signal::ctrl_c().await;
 }
 
 #[derive(Debug)]
@@ -233,7 +232,7 @@ async fn health(State(state): State<AppState>) -> Json<Health> {
 }
 
 async fn plugins(State(state): State<AppState>) -> Json<Value> {
-    Json(json!({"plugins": state.registry.plugins()}))
+    Json(json!({"plugins": state.registry.read().await.plugins()}))
 }
 
 async fn plugin_get(
@@ -242,28 +241,30 @@ async fn plugin_get(
 ) -> Result<Json<Value>, ApiError> {
     state
         .registry
+        .read()
+        .await
         .plugin(&plugin_id)
         .map(|plugin| Json(json!(plugin)))
         .ok_or_else(|| ApiError(StatusCode::NOT_FOUND, "plugin not found".into()))
 }
 
 async fn plugin_diagnostics(State(state): State<AppState>) -> Json<Value> {
-    Json(json!({"diagnostics": state.registry.diagnostics()}))
+    Json(json!({"diagnostics": state.registry.read().await.diagnostics()}))
 }
 
 async fn capabilities(State(state): State<AppState>) -> Json<Value> {
-    Json(json!({"capabilities": state.registry.capabilities()}))
+    Json(json!({"capabilities": state.registry.read().await.capabilities()}))
 }
 
 async fn capability_tools(
     State(state): State<AppState>,
     Path(capability_id): Path<String>,
 ) -> Result<Json<Value>, ApiError> {
-    let capability = state
-        .registry
+    let registry = state.registry.read().await;
+    let capability = registry
         .capability(&capability_id)
         .ok_or_else(|| ApiError(StatusCode::NOT_FOUND, "capability not found".into()))?;
-    let projections = state.registry.tools();
+    let projections = registry.tools();
     let names = capability
         .providers
         .iter()
@@ -277,7 +278,7 @@ async fn capability_tools(
 }
 
 async fn tools(State(state): State<AppState>) -> Json<Value> {
-    Json(json!({"tools": state.registry.tools()}))
+    Json(json!({"tools": state.registry.read().await.tools()}))
 }
 
 async fn invoke_tool(
@@ -285,11 +286,11 @@ async fn invoke_tool(
     Path(tool_name): Path<String>,
     Json(request): Json<InvokeRequest>,
 ) -> Result<Response, ApiError> {
-    if !state.registry.has_tool(&tool_name) {
+    let registry = state.registry.read().await;
+    if !registry.has_tool(&tool_name) {
         return Err(ApiError(StatusCode::NOT_FOUND, "tool not found".into()));
     }
-    match state
-        .registry
+    match registry
         .invoke(&tool_name, request, &state.scheduler)
         .await
         .map_err(ApiError::from)?

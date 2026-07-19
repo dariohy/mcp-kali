@@ -1,5 +1,9 @@
 use anyhow::{Context, Result, bail};
-use std::{env, ffi::OsString, path::PathBuf};
+use std::{
+    env,
+    ffi::OsString,
+    path::{Path, PathBuf},
+};
 
 const CONFIG_FILE_VARIABLE: &str = "MCP_KALI_CONFIG_FILE";
 const HOME_VARIABLE: &str = "MCP_KALI_HOME";
@@ -32,6 +36,21 @@ pub fn load_config_file() -> Result<Option<PathBuf>> {
     dotenvy::from_path(&path)
         .with_context(|| format!("load configuration file {}", path.display()))?;
     Ok(Some(path))
+}
+
+/// Reads one value from a configuration file without mutating the process
+/// environment. This supports runtime reloads of selected settings.
+pub fn read_config_value(path: &Path, key: &str) -> Result<Option<String>> {
+    let iterator = dotenvy::from_path_iter(path)
+        .with_context(|| format!("read configuration file {}", path.display()))?;
+    for item in iterator {
+        let (candidate, value) =
+            item.with_context(|| format!("parse configuration file {}", path.display()))?;
+        if candidate == key {
+            return Ok(Some(value));
+        }
+    }
+    Ok(None)
 }
 
 fn config_file_from_args(args: impl IntoIterator<Item = OsString>) -> Result<Option<PathBuf>> {
@@ -120,5 +139,17 @@ mod tests {
         let joined =
             config_file_from_args(["binary".into(), "--config-file=/tmp/b.conf".into()]).unwrap();
         assert_eq!(joined, Some(PathBuf::from("/tmp/b.conf")));
+    }
+
+    #[test]
+    fn reads_a_value_without_changing_the_environment() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("mcp-kali.conf");
+        std::fs::write(&path, "MCP_KALI_MAX_CONCURRENCY=4\n").unwrap();
+        assert_eq!(
+            read_config_value(&path, "MCP_KALI_MAX_CONCURRENCY").unwrap(),
+            Some("4".into())
+        );
+        assert_eq!(read_config_value(&path, "MISSING").unwrap(), None);
     }
 }

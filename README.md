@@ -244,7 +244,9 @@ For a declarative tool that needs privileged probes, set its tool-level
 `requirements.privilege: root`. With the default
 `MCP_KALI_PRIVILEGE_ELEVATION=auto`, the server runs that tool directly when it
 is already root, otherwise as `sudo -n -- program args...`; it never prompts.
-`none` disables that automatic prefix. This setting does not change the Core
+At startup, auto mode verifies that the server user can use non-interactive
+sudo and publishes root-required tools as disabled when it cannot. `none`
+disables that automatic prefix. This setting does not change the Core
 `execute_command` tool: callers may explicitly invoke `sudo -n` as its program
 when needed.
 
@@ -273,6 +275,20 @@ For a long-lived bridge connection, it polls the server every five seconds and
 sends the MCP `notifications/tools/list_changed` notification when the
 projection changes, so capable hosts can refresh their tool index after a
 server restart or Plugin change.
+
+### Runtime signals
+
+`SIGTERM` (and `SIGINT`) performs a graceful shutdown: the server stops
+accepting jobs, cancels queued work, sends `SIGTERM` to active job process
+groups, waits up to 10 seconds, then force-kills survivors and persists their
+terminal state before exiting. `SIGHUP` atomically reloads the
+Plugin/catalog runtime. When `MCP_KALI_MAX_CONCURRENCY` comes from the loaded
+configuration file rather than an environment variable or CLI flag, `SIGHUP`
+also applies its new value without interrupting running jobs. A lower limit
+drains naturally; a higher limit starts queued jobs immediately. A reload with
+configuration or Plugin diagnostics retains the prior runtime.
+Send a second `SIGTERM` (or `SIGINT`) to skip the grace period and immediately
+force-kill active job process groups.
 The always-available job Plugin exposes listing, status, output paging, cancel,
 pause, resume, force-kill, and health operations. Every tool response is wrapped
 in an `untrusted_job_execution_data` envelope. Job

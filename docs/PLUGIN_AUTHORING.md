@@ -69,10 +69,13 @@ startup. Tool-level `requirements.privilege` may be `root`. It is published in
 the MCP metadata and, with the default `MCP_KALI_PRIVILEGE_ELEVATION=auto`, the
 runtime executes that declarative tool as `sudo -n -- program args...` unless
 the server is already root. `sudo -n` never prompts; the host's sudoers policy
-decides whether the job succeeds. Set the runtime mode to `none` to leave the
-argv unchanged. Plugin-level privilege remains descriptive; declare it on each
-tool that needs elevation. `policy.requires_explicit_enable` only marks a tool
-privileged in the public projection.
+decides whether the job succeeds. At startup the runtime probes non-interactive
+sudo and publishes an `enabled` flag plus `_meta.elevation` status for each
+tool; a failed probe disables root-required tools in auto mode. Command-specific
+sudoers rules may still reject an individual job. Set the runtime mode to `none`
+to leave the argv unchanged. Plugin-level privilege remains descriptive; declare
+it on each tool that needs elevation. `policy.requires_explicit_enable` only
+marks a tool privileged in the public projection.
 
 ## Safe argument templates
 

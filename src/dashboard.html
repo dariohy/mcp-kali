@@ -38,7 +38,7 @@
     .runtime-summary { margin:15px 0; color:#9aabb6; } .runtime-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:10px; }
     .runtime-card { border:1px solid #293942; border-radius:8px; background:#10191f; padding:12px; } .runtime-card h2 { margin:0; font-size:16px; }
     .runtime-card p { margin:7px 0; } .runtime-card code { display:inline; white-space:normal; overflow-wrap:anywhere; }
-    .runtime-status { font-weight:700; font-size:11px; letter-spacing:.04em; text-transform:uppercase; } .available { color:#74e6aa; } .unavailable { color:#ff9292; } .root-required { color:#ffd166; }
+    .runtime-status { font-weight:700; font-size:11px; letter-spacing:.04em; text-transform:uppercase; } .available { color:#74e6aa; } .unavailable { color:#ff9292; } .root-required { color:#ffd166; } .disabled { color:#ff9292; }
     .tool-list { margin:8px 0 0; padding-left:18px; } .tool-list li { margin:5px 0; } .tool-description { color:#9aabb6; }
     .diagnostics { margin-top:18px; } .diagnostic-card { border-color:#653b42; background:#24171c; } .diagnostic-card h2 { color:#ffb4b4; }
     @media (max-width: 850px) { .row { grid-template-columns: 34px 82px minmax(80px,1fr) auto; } .command,.elapsed { display:none; } .detail { grid-template-columns:1fr; } }
@@ -103,6 +103,14 @@
     refreshEl.textContent = `${autoRefreshEnabled ? 'Auto-refreshing every 5 seconds' : 'Auto-refresh stopped'}${updated}`;
   }
   function values(values) { return Array.isArray(values) && values.length ? values.map(esc).join(', ') : 'None'; }
+  function elevationBadge(tool) {
+    const elevation = tool._meta?.elevation;
+    if (!elevation || elevation.status === 'not_required') return '';
+    const enabled = tool._meta?.enabled !== false;
+    const label = enabled ? `root · ${elevation.status.replaceAll('_', ' ')}` : 'disabled · elevation unavailable';
+    const detail = elevation.message ? ` title="${esc(elevation.message)}"` : '';
+    return ` <span class="runtime-status ${enabled ? 'root-required' : 'disabled'}"${detail}>${esc(label)}</span>`;
+  }
   function renderTools() {
     const byPlugin = new Map();
     for (const tool of toolDefinitions) {
@@ -113,10 +121,10 @@
     const available = plugins.map(plugin => {
       const tools = byPlugin.get(plugin.id) || [];
       const requirements = plugin.requirements?.commands || [];
-      return `<article class="runtime-card"><div><span class="runtime-status available">Available</span> <h2>${esc(plugin.name)} <span class="muted">${esc(plugin.version)}</span></h2></div><p><code>${esc(plugin.id)}</code> · ${esc(plugin.source)}</p><p>${esc(plugin.description || 'No description.')}</p><p><b>Required commands:</b> ${values(requirements)}</p><p><b>Registered tools (${tools.length}):</b></p><ul class="tool-list">${tools.map(tool => `<li><code>${esc(tool.name)}</code>${tool._meta?.privilege ? ` <span class="runtime-status root-required">requires ${esc(tool._meta.privilege)}</span>` : ''} <span class="tool-description">${esc(tool.description)}</span></li>`).join('') || '<li class="muted">No tools registered.</li>'}</ul></article>`;
+      return `<article class="runtime-card"><div><span class="runtime-status available">Available</span> <h2>${esc(plugin.name)} <span class="muted">${esc(plugin.version)}</span></h2></div><p><code>${esc(plugin.id)}</code> · ${esc(plugin.source)}</p><p>${esc(plugin.description || 'No description.')}</p><p><b>Required commands:</b> ${values(requirements)}</p><p><b>Registered tools (${tools.length}):</b></p><ul class="tool-list">${tools.map(tool => `<li><code>${esc(tool.name)}</code>${elevationBadge(tool)} <span class="tool-description">${esc(tool.description)}</span></li>`).join('') || '<li class="muted">No tools registered.</li>'}</ul></article>`;
     }).join('') || '<div class="empty">No Plugins are registered.</div>';
     const unavailable = diagnostics.map(diagnostic => `<article class="runtime-card diagnostic-card"><span class="runtime-status unavailable">Unavailable</span><h2>${esc(diagnostic.plugin_id || diagnostic.tool_name || 'Plugin definition')}</h2><p><b>Layer:</b> ${esc(diagnostic.layer)} · <code>${esc(diagnostic.path)}</code></p><p>${esc(diagnostic.message)}</p></article>`).join('') || '<div class="empty">No Plugin diagnostics. All discovered definitions are available.</div>';
-    toolsPanel.innerHTML = `<p class="runtime-summary">Tools are discovered at server startup. If a Plugin requires an executable that is absent from the server PATH, that Plugin is not published to MCP; the server and other Plugins continue running. Tools marked “requires root” use non-interactive sudo in the default auto elevation mode unless the server already runs as root.</p><div class="runtime-grid">${available}</div><div class="diagnostics"><h2>Unavailable definitions and diagnostics (${diagnostics.length})</h2><div class="runtime-grid">${unavailable}</div></div>`;
+    toolsPanel.innerHTML = `<p class="runtime-summary">Tools are discovered at server startup. If a Plugin requires an executable that is absent from the server PATH, that Plugin is not published to MCP; the server and other Plugins continue running. In auto elevation mode, mcp-kali checks non-interactive sudo at startup and marks root-required tools disabled when it is unavailable.</p><div class="runtime-grid">${available}</div><div class="diagnostics"><h2>Unavailable definitions and diagnostics (${diagnostics.length})</h2><div class="runtime-grid">${unavailable}</div></div>`;
   }
   function render() {
     const activeJobs = jobs.filter(j => activeStates.has(j.state));

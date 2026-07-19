@@ -5,14 +5,17 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 use tokio::{
     fs,
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
     process::Command,
-    sync::{Mutex, Notify, Semaphore},
+    sync::{Mutex, Notify},
     time::timeout,
 };
 use tokio_util::sync::CancellationToken;
@@ -27,6 +30,8 @@ const MAX_ARG_COUNT: usize = 1024;
 const MAX_ARG_BYTES: usize = 64 * 1024;
 const MAX_COMMAND_BYTES: usize = 256 * 1024;
 const MAX_TOOL_BYTES: usize = 128;
+const JOB_TERMINATION_GRACE: Duration = Duration::from_secs(5);
+const SHUTDOWN_TERMINATION_GRACE: Duration = Duration::from_secs(10);
 
 #[derive(Serialize, Deserialize)]
 struct PrivateJobSpec {
@@ -52,12 +57,17 @@ struct Inner {
     jobs: Mutex<HashMap<Uuid, Job>>,
     cancellations: Mutex<HashMap<Uuid, CancellationToken>>,
     process_ids: Mutex<HashMap<Uuid, i32>>,
-    permits: Arc<Semaphore>,
+    dispatch: Mutex<DispatchState>,
     notify: Notify,
+    accepting: AtomicBool,
     default_timeout: u64,
-    max_concurrency: usize,
     reveal_sensitive_data: bool,
     webhook_client: reqwest::Client,
+}
+
+struct DispatchState {
+    max_concurrency: usize,
+    running: usize,
 }
 
 impl Scheduler {
@@ -89,10 +99,13 @@ impl Scheduler {
                 jobs: Mutex::new(HashMap::new()),
                 cancellations: Mutex::new(HashMap::new()),
                 process_ids: Mutex::new(HashMap::new()),
-                permits: Arc::new(Semaphore::new(max_concurrency)),
+                dispatch: Mutex::new(DispatchState {
+                    max_concurrency,
+                    running: 0,
+                }),
                 notify: Notify::new(),
+                accepting: AtomicBool::new(true),
                 default_timeout,
-                max_concurrency,
                 reveal_sensitive_data,
                 webhook_client: reqwest::Client::new(),
             }),
@@ -158,6 +171,9 @@ impl Scheduler {
     }
 
     pub async fn submit(&self, request: SubmitJob) -> Result<Job> {
+        if !self.inner.accepting.load(Ordering::Acquire) {
+            bail!("scheduler is shutting down");
+        }
         if request.argv.is_empty() || request.argv[0].is_empty() {
             bail!("argv must contain an executable");
         }
@@ -244,7 +260,94 @@ impl Scheduler {
             .values()
             .filter(|j| j.state == JobState::Running)
             .count();
-        (queued, running, self.inner.max_concurrency)
+        let max_concurrency = self.inner.dispatch.lock().await.max_concurrency;
+        (queued, running, max_concurrency)
+    }
+
+    /// Updates the dispatch ceiling without interrupting running jobs.
+    pub async fn set_max_concurrency(&self, max_concurrency: usize) -> Result<()> {
+        if max_concurrency == 0 || max_concurrency > 256 {
+            bail!("max_concurrency must be between 1 and 256");
+        }
+        self.inner.dispatch.lock().await.max_concurrency = max_concurrency;
+        self.inner.notify.notify_one();
+        Ok(())
+    }
+
+    /// Stops new submissions, cancels queued work, and waits for active job
+    /// process groups to terminate.
+    pub async fn shutdown(&self) {
+        self.begin_shutdown().await;
+        self.wait_for_shutdown().await;
+    }
+
+    /// Starts graceful shutdown once. Subsequent calls are harmless.
+    pub async fn begin_shutdown(&self) {
+        if !self.inner.accepting.swap(false, Ordering::AcqRel) {
+            return;
+        }
+        let running = {
+            let mut jobs = self.inner.jobs.lock().await;
+            let mut running = Vec::new();
+            for job in jobs.values_mut() {
+                match job.state {
+                    JobState::Queued => {
+                        job.state = JobState::Cancelled;
+                        job.finished_at = Some(Utc::now());
+                        job.error = Some("server shutting down".into());
+                        if let Err(error) = persist_at(&self.inner.root, job).await {
+                            error!(id = %job.id, %error, "could not persist cancelled job during shutdown");
+                        }
+                    }
+                    JobState::Running | JobState::Paused => running.push(job.id),
+                    _ => {}
+                }
+            }
+            running
+        };
+        let cancellations = self.inner.cancellations.lock().await;
+        for id in running {
+            if let Some(token) = cancellations.get(&id) {
+                token.cancel();
+            }
+        }
+        drop(cancellations);
+    }
+
+    /// Waits for active job runners to reach terminal states.
+    pub async fn wait_for_shutdown(&self) {
+        while self
+            .inner
+            .jobs
+            .lock()
+            .await
+            .values()
+            .any(|job| matches!(job.state, JobState::Running | JobState::Paused))
+        {
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+    }
+
+    /// Immediately kills active job process groups. Used only when shutdown is
+    /// explicitly escalated by a second termination signal.
+    pub async fn force_kill_active(&self) {
+        self.begin_shutdown().await;
+        let process_ids = self
+            .inner
+            .process_ids
+            .lock()
+            .await
+            .values()
+            .copied()
+            .collect::<Vec<_>>();
+        for pid in process_ids {
+            if let Err(error) = signal_process_group(pid, libc::SIGKILL) {
+                warn!(%pid, %error, "could not force-kill job process group during shutdown");
+            }
+        }
+        for token in self.inner.cancellations.lock().await.values() {
+            token.cancel();
+        }
     }
 
     pub async fn cancel(&self, id: Uuid) -> Result<Job> {
@@ -436,11 +539,23 @@ impl Scheduler {
         loop {
             self.inner.notify.notified().await;
             loop {
-                let Ok(permit) = self.inner.permits.clone().acquire_owned().await else {
-                    return;
+                if !self.inner.accepting.load(Ordering::Acquire) {
+                    break;
+                }
+                let can_dispatch = {
+                    let mut dispatch = self.inner.dispatch.lock().await;
+                    if dispatch.running >= dispatch.max_concurrency {
+                        false
+                    } else {
+                        dispatch.running += 1;
+                        true
+                    }
                 };
+                if !can_dispatch {
+                    break;
+                }
                 let Some(id) = self.next_queued().await else {
-                    drop(permit);
+                    self.dispatch_finished().await;
                     break;
                 };
                 let scheduler = self.clone();
@@ -448,14 +563,22 @@ impl Scheduler {
                     if let Err(error) = scheduler.run(id).await {
                         error!(%id, %error, "job runner failed");
                     }
-                    drop(permit);
+                    scheduler.dispatch_finished().await;
                     scheduler.inner.notify.notify_one();
                 });
             }
         }
     }
 
+    async fn dispatch_finished(&self) {
+        let mut dispatch = self.inner.dispatch.lock().await;
+        dispatch.running = dispatch.running.saturating_sub(1);
+    }
+
     async fn next_queued(&self) -> Option<Uuid> {
+        if !self.inner.accepting.load(Ordering::Acquire) {
+            return None;
+        }
         let mut jobs = self.inner.jobs.lock().await;
         let id = jobs
             .values()
@@ -522,12 +645,17 @@ impl Scheduler {
                 }
                 tokio::select! {
                     _ = token.cancelled() => {
-                        terminate(&mut child).await;
+                        let grace = if self.inner.accepting.load(Ordering::Acquire) {
+                            JOB_TERMINATION_GRACE
+                        } else {
+                            SHUTDOWN_TERMINATION_GRACE
+                        };
+                        terminate(&mut child, grace).await;
                         (JobState::Cancelled, None, None)
                     }
                     result = timeout(Duration::from_secs(job.timeout_seconds), child.wait()) => match result {
                         Err(_) => {
-                            terminate(&mut child).await;
+                            terminate(&mut child, JOB_TERMINATION_GRACE).await;
                             (JobState::TimedOut, None, Some(format!("timed out after {} seconds", job.timeout_seconds)))
                         }
                         Ok(Err(error)) => (JobState::Failed, None, Some(error.to_string())),
@@ -579,13 +707,13 @@ impl Scheduler {
     }
 }
 
-async fn terminate(child: &mut tokio::process::Child) {
+async fn terminate(child: &mut tokio::process::Child, grace: Duration) {
     #[cfg(unix)]
     if let Some(pid) = child.id() {
         // The child starts its own process group so scanner descendants do not
         // survive cancellation or timeout as orphaned processes.
         unsafe { libc::kill(-(pid as i32), libc::SIGTERM) };
-        if timeout(Duration::from_secs(5), child.wait()).await.is_err() {
+        if timeout(grace, child.wait()).await.is_err() {
             unsafe { libc::kill(-(pid as i32), libc::SIGKILL) };
             let _ = child.wait().await;
         }
@@ -828,6 +956,164 @@ mod tests {
         assert_eq!(
             scheduler.get(job.id).await.unwrap().state,
             JobState::Cancelled
+        );
+    }
+
+    #[tokio::test]
+    async fn concurrency_can_increase_without_interrupting_running_jobs() {
+        let temp = tempfile::tempdir().unwrap();
+        let scheduler = Scheduler::open(temp.path().into(), 1, 10).await.unwrap();
+        let first = scheduler
+            .submit(SubmitJob {
+                tool: None,
+                argv: vec!["sleep".into(), "1".into()],
+                timeout_seconds: None,
+                webhook_url: None,
+            })
+            .await
+            .unwrap();
+        let second = scheduler
+            .submit(SubmitJob {
+                tool: None,
+                argv: vec!["sleep".into(), "1".into()],
+                timeout_seconds: None,
+                webhook_url: None,
+            })
+            .await
+            .unwrap();
+        for _ in 0..100 {
+            if scheduler.get(first.id).await.unwrap().state == JobState::Running {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert_eq!(
+            scheduler.get(second.id).await.unwrap().state,
+            JobState::Queued
+        );
+        scheduler.set_max_concurrency(2).await.unwrap();
+        for _ in 0..100 {
+            if scheduler.get(second.id).await.unwrap().state == JobState::Running {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert_eq!(
+            scheduler.get(first.id).await.unwrap().state,
+            JobState::Running
+        );
+        assert_eq!(
+            scheduler.get(second.id).await.unwrap().state,
+            JobState::Running
+        );
+        assert_eq!(scheduler.counts().await.2, 2);
+        scheduler.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn lowering_concurrency_waits_for_running_jobs_to_drain() {
+        let temp = tempfile::tempdir().unwrap();
+        let scheduler = Scheduler::open(temp.path().into(), 2, 10).await.unwrap();
+        let first = scheduler
+            .submit(SubmitJob {
+                tool: None,
+                argv: vec!["sleep".into(), "0.2".into()],
+                timeout_seconds: None,
+                webhook_url: None,
+            })
+            .await
+            .unwrap();
+        let second = scheduler
+            .submit(SubmitJob {
+                tool: None,
+                argv: vec!["sleep".into(), "1".into()],
+                timeout_seconds: None,
+                webhook_url: None,
+            })
+            .await
+            .unwrap();
+        for _ in 0..100 {
+            if scheduler.get(first.id).await.unwrap().state == JobState::Running
+                && scheduler.get(second.id).await.unwrap().state == JobState::Running
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        scheduler.set_max_concurrency(1).await.unwrap();
+        let third = scheduler
+            .submit(SubmitJob {
+                tool: None,
+                argv: vec!["sleep".into(), "1".into()],
+                timeout_seconds: None,
+                webhook_url: None,
+            })
+            .await
+            .unwrap();
+        for _ in 0..100 {
+            if scheduler.get(first.id).await.unwrap().state.is_terminal() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert_eq!(
+            scheduler.get(second.id).await.unwrap().state,
+            JobState::Running
+        );
+        assert_eq!(
+            scheduler.get(third.id).await.unwrap().state,
+            JobState::Queued
+        );
+        scheduler.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn shutdown_cancels_queued_and_running_jobs_and_rejects_submissions() {
+        let temp = tempfile::tempdir().unwrap();
+        let scheduler = Scheduler::open(temp.path().into(), 1, 10).await.unwrap();
+        let running = scheduler
+            .submit(SubmitJob {
+                tool: None,
+                argv: vec!["sleep".into(), "10".into()],
+                timeout_seconds: None,
+                webhook_url: None,
+            })
+            .await
+            .unwrap();
+        let queued = scheduler
+            .submit(SubmitJob {
+                tool: None,
+                argv: vec!["sleep".into(), "10".into()],
+                timeout_seconds: None,
+                webhook_url: None,
+            })
+            .await
+            .unwrap();
+        for _ in 0..100 {
+            if scheduler.get(running.id).await.unwrap().state == JobState::Running {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        scheduler.shutdown().await;
+        assert_eq!(
+            scheduler.get(running.id).await.unwrap().state,
+            JobState::Cancelled
+        );
+        assert_eq!(
+            scheduler.get(queued.id).await.unwrap().state,
+            JobState::Cancelled
+        );
+        assert!(
+            scheduler
+                .submit(SubmitJob {
+                    tool: None,
+                    argv: vec!["true".into()],
+                    timeout_seconds: None,
+                    webhook_url: None,
+                })
+                .await
+                .is_err()
         );
     }
 
