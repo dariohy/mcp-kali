@@ -15,6 +15,10 @@ All notable changes to MCP Kali are documented here. The project follows
   whether each root-required tool is enabled.
 - Unix `SIGTERM`/`SIGINT` graceful shutdown and `SIGHUP` atomic Plugin/catalog
   reload, including configuration-file scheduler-concurrency reload.
+- Base systemd unit template, system configuration example, and explicit
+  root-only Makefile install/enable/status/log targets.
+- Unified user and system Plugin/catalog declaration locations under their
+  respective `etc/plugins` configuration trees.
 
 ### Changed
 

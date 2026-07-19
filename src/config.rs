@@ -7,6 +7,7 @@ use std::{
 
 const CONFIG_FILE_VARIABLE: &str = "MCP_KALI_CONFIG_FILE";
 const HOME_VARIABLE: &str = "MCP_KALI_HOME";
+const SYSTEM_CONFIG_FILE: &str = "/etc/mcp-kali/mcp-kali.conf";
 
 /// Loads the shared MCP Kali configuration file before Clap resolves
 /// environment-backed options. The file uses a simple `KEY=VALUE` format so
@@ -95,7 +96,7 @@ pub fn default_state_dir() -> PathBuf {
 
 pub fn default_system_data_dir() -> PathBuf {
     default_mcp_kali_home()
-        .map(|home| home.join("share"))
+        .map(|home| home.join("etc"))
         .unwrap_or_else(|| PathBuf::from("/usr/local/share/mcp-kali"))
 }
 
@@ -106,7 +107,14 @@ pub fn default_config_dir() -> PathBuf {
 }
 
 fn default_config_file() -> Option<PathBuf> {
-    default_mcp_kali_home().map(|home| home.join("etc/mcp-kali.conf"))
+    preferred_config_file(
+        PathBuf::from(SYSTEM_CONFIG_FILE),
+        default_mcp_kali_home().map(|home| home.join("etc/mcp-kali.conf")),
+    )
+}
+
+fn preferred_config_file(system: PathBuf, user: Option<PathBuf>) -> Option<PathBuf> {
+    if system.is_file() { Some(system) } else { user }
 }
 
 fn expand_home(path: PathBuf) -> PathBuf {
@@ -151,5 +159,22 @@ mod tests {
             Some("4".into())
         );
         assert_eq!(read_config_value(&path, "MISSING").unwrap(), None);
+    }
+
+    #[test]
+    fn system_config_wins_when_present() {
+        let directory = tempfile::tempdir().unwrap();
+        let system = directory.path().join("system.conf");
+        let user = directory.path().join("user.conf");
+        std::fs::write(&system, "KEY=VALUE\n").unwrap();
+        assert_eq!(
+            preferred_config_file(system.clone(), Some(user.clone())),
+            Some(system.clone())
+        );
+        std::fs::remove_file(&system).unwrap();
+        assert_eq!(
+            preferred_config_file(system, Some(user.clone())),
+            Some(user)
+        );
     }
 }

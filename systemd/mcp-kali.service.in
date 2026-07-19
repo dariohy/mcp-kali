@@ -1,0 +1,30 @@
+[Unit]
+Description=MCP Kali scheduler and HTTP API
+Documentation=https://github.com/dariohy/mcp-kali
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=exec
+User=@MCP_KALI_USER@
+Group=@MCP_KALI_GROUP@
+WorkingDirectory=/var/lib/mcp-kali
+EnvironmentFile=-/etc/mcp-kali/mcp-kali.conf
+ExecStart=@MCP_KALI_BIN@ --config-file /etc/mcp-kali/mcp-kali.conf
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=2s
+TimeoutStopSec=15s
+UMask=0077
+StateDirectory=mcp-kali
+ConfigurationDirectory=mcp-kali
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+# Deliberately do not set NoNewPrivileges=yes, PrivateUsers=yes, or a
+# restrictive CapabilityBoundingSet=. Root-required declarative tools rely on
+# the selected service user's external passwordless sudo policy.
+
+[Install]
+WantedBy=multi-user.target

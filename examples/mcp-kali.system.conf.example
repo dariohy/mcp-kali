@@ -1,0 +1,18 @@
+# System service configuration. Copy to /etc/mcp-kali/mcp-kali.conf.
+# This file contains no secrets. The selected systemd User= must be able to
+# read it, write the state directory, and use passwordless sudo when root-
+# required declarative tools are enabled.
+
+RUST_LOG=mcp_kali=info,tower_http=info
+MCP_KALI_BIND=127.0.0.1:5000
+MCP_KALI_STATE_DIR=/var/lib/mcp-kali/jobs
+# System Plugin manifests and the capability catalog are administrator-managed
+# configuration under /etc, not packaged runtime data under /usr/local/share.
+MCP_KALI_SYSTEM_DATA_DIR=/etc/mcp-kali
+MCP_KALI_CONFIG_DIR=/etc/mcp-kali
+MCP_KALI_MAX_CONCURRENCY=2
+MCP_KALI_DEFAULT_TIMEOUT=1800
+MCP_KALI_REVEAL_SENSITIVE_DATA=false
+MCP_KALI_PRIVILEGE_ELEVATION=auto
+MCP_KALI_DISABLE_EXECUTE_COMMAND=false
+MCP_KALI_ALLOW_REMOTE_BIND=false

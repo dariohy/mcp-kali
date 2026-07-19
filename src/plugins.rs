@@ -322,12 +322,14 @@ impl PluginRegistry {
             &system_data_dir.join("plugins/capability-catalog.yaml"),
             &mut catalog,
         );
-        registry.load_layer("overlay", &config_dir.join("plugins"), true);
-        registry.load_catalog_layer(
-            "overlay",
-            &config_dir.join("plugins/capability-catalog.yaml"),
-            &mut catalog,
-        );
+        if config_dir != system_data_dir {
+            registry.load_layer("overlay", &config_dir.join("plugins"), true);
+            registry.load_catalog_layer(
+                "overlay",
+                &config_dir.join("plugins/capability-catalog.yaml"),
+                &mut catalog,
+            );
+        }
         registry.resolve_capabilities(catalog);
         registry
     }

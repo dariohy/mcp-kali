@@ -85,17 +85,16 @@ target/release/mcp-kali-bridge
 ├── bin/                         # mcp-kali and mcp-kali-bridge
 ├── etc/
 │   ├── mcp-kali.conf            # normal, non-secret user configuration
-│   └── plugins/                 # administrator-overlay Plugins and catalog
-├── share/plugins/               # shipped Plugins and capability catalog
-│   ├── capability-catalog.yaml
-│   └── <plugin>/plugin.yaml
+│   └── plugins/                 # Plugin manifests and capability catalog
+│       ├── capability-catalog.yaml
+│       └── <plugin>/plugin.yaml
 └── var/jobs/                    # private durable job state and output
 ```
 
 Install it with:
 
 ```bash
-make install-local
+make install
 ```
 
 The installer also creates or updates symlinks for both binaries in
@@ -115,7 +114,37 @@ make install-local MCP_KALI_HOME=/path/to/mcp-kali
 
 Set `MCP_KALI_HOME=/path/to/mcp-kali` when running a relocated installation.
 `install-local` intentionally refuses root: system-wide service installation
-and its required dedicated user/systemd unit will be added separately.
+uses a separate, explicit workflow.
+
+### Systemd installation (Kali/Linux)
+
+The repository includes a systemd unit template and a root-only installer. It
+does not create an account or sudoers rule: choose an existing authorized Kali
+user that has the required tools and, when root-required Plugin tools are used,
+noninteractive sudo permission.
+
+```bash
+sudo make install MCP_KALI_USER=kali MCP_KALI_GROUP=kali
+sudo make systemd-reload enable-system
+```
+
+When run as a regular user, `make install` creates the per-user tree. When run
+as root, it performs the system install and requires `MCP_KALI_USER` to name an
+existing authorized service account. `install-local` and `install-system`
+remain available when automation needs to force a mode.
+
+The system install places binaries under `/usr/local/bin`, Plugin manifests and the
+capability catalog under `/etc/mcp-kali/plugins`, a non-secret configuration
+template at `/etc/mcp-kali/mcp-kali.conf`, private state under
+`/var/lib/mcp-kali/jobs`, and the generated `mcp-kali.service` unit. Review the
+configuration and sudoers policy before enabling it. Use `make status-system`
+and `make logs-system` for operations; `systemctl reload mcp-kali` maps to
+`SIGHUP`.
+
+When no `--config-file` or `MCP_KALI_CONFIG_FILE` is selected, MCP Kali uses
+`/etc/mcp-kali/mcp-kali.conf` if it exists. If it does not, it falls back to the
+existing per-user `~/.mcp-kali/etc/mcp-kali.conf` lookup, preserving standalone
+operation.
 
 Release builds use size optimization, full LTO, one codegen unit, stripped
 symbols, and abort-on-panic behavior. No scheduler, API, dashboard, or MCP
@@ -162,7 +191,7 @@ Configuration precedence, from lowest to highest, is:
 
 ```text
 hardcoded defaults
--> ~/.mcp-kali/etc/mcp-kali.conf (or selected config file)
+-> /etc/mcp-kali/mcp-kali.conf when present, otherwise ~/.mcp-kali/etc/mcp-kali.conf (or selected config file)
 -> existing shell environment
 -> command-line arguments
 ```
@@ -184,15 +213,15 @@ not accept the prior `--env-file` / `MCP_KALI_ENV_FILE` selectors.
 | Variable | Binary | Default | Description |
 |---|---|---:|---|
 | `MCP_KALI_HOME` | Both | `~/.mcp-kali` | Root of the self-contained per-user tree |
-| `MCP_KALI_CONFIG_FILE` | Both | `~/.mcp-kali/etc/mcp-kali.conf` | Alternate configuration-file path |
+| `MCP_KALI_CONFIG_FILE` | Both | `/etc/mcp-kali/mcp-kali.conf` when present, otherwise `~/.mcp-kali/etc/mcp-kali.conf` | Alternate configuration-file path |
 | `RUST_LOG` | Both | Binary-specific info filter | Tracing filter; logs go to stderr |
 | `MCP_KALI_BIND` | Server | `127.0.0.1:5000` | HTTP API/dashboard bind address |
 | `MCP_KALI_STATE_DIR` | Server | `~/.mcp-kali/var/jobs` | Private durable job directory |
 | `MCP_KALI_MAX_CONCURRENCY` | Server | `2` | Simultaneous jobs, range 1–256 |
 | `MCP_KALI_DEFAULT_TIMEOUT` | Server | `1800` | Default wall timeout, range 1–604800 seconds |
 | `MCP_KALI_REVEAL_SENSITIVE_DATA` | Server | `false` | Show unredacted commands in public records |
-| `MCP_KALI_SYSTEM_DATA_DIR` | Server | `~/.mcp-kali/share` | Shipped Plugins and base catalog |
-| `MCP_KALI_CONFIG_DIR` | Server | `~/.mcp-kali/etc` | Administrator Plugin/catalog overlay |
+| `MCP_KALI_SYSTEM_DATA_DIR` | Server | `~/.mcp-kali/etc` | Plugin manifests and base catalog |
+| `MCP_KALI_CONFIG_DIR` | Server | `~/.mcp-kali/etc` | Plugin and catalog configuration directory |
 | `MCP_KALI_DISABLE_EXECUTE_COMMAND` | Server | `false` | Remove the privileged free-execution tool |
 | `MCP_KALI_PRIVILEGE_ELEVATION` | Server | `auto` | `auto` uses `sudo -n` for declarative root-required tools unless already root; `none` runs them directly |
 | `MCP_KALI_ALLOW_REMOTE_BIND` | Server | `false` | Acknowledge an unauthenticated non-loopback bind |

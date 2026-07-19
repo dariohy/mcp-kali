@@ -167,7 +167,7 @@ stack unwinding in the release binaries.
 ### Local user installation
 
 ```bash
-make install-local
+make install
 ```
 
 This creates a non-root, self-contained user installation:
@@ -177,10 +177,9 @@ This creates a non-root, self-contained user installation:
 ├── bin/                         # executable binaries
 ├── etc/
 │   ├── mcp-kali.conf            # normal, non-secret configuration
-│   └── plugins/                 # local Plugin/catalog overlay
-├── share/plugins/               # packaged Plugin data
-│   ├── capability-catalog.yaml
-│   └── <plugin>/plugin.yaml
+│   └── plugins/                 # Plugin manifests and capability catalog
+│       ├── capability-catalog.yaml
+│       └── <plugin>/plugin.yaml
 └── var/jobs/                    # durable private job data
 ```
 
@@ -261,7 +260,7 @@ install -m 644 examples/mcp-kali.conf.example ~/.mcp-kali/etc/mcp-kali.conf
 | Variable | Required | Default | Meaning |
 |---|---:|---|---|
 | `MCP_KALI_HOME` | No | `~/.mcp-kali` | Root of the self-contained per-user tree |
-| `MCP_KALI_CONFIG_FILE` | No | `~/.mcp-kali/etc/mcp-kali.conf` | Alternate configuration-file path |
+| `MCP_KALI_CONFIG_FILE` | No | `/etc/mcp-kali/mcp-kali.conf` when present, otherwise `~/.mcp-kali/etc/mcp-kali.conf` | Alternate configuration-file path |
 | `RUST_LOG` | No | `mcp_kali=info` plus server HTTP info | Tracing filter written to stderr |
 
 Examples:
@@ -283,7 +282,7 @@ messages. The binaries already direct tracing to stderr.
 | `MCP_KALI_MAX_CONCURRENCY` | `--max-concurrency` | `2` | 1–256 |
 | `MCP_KALI_DEFAULT_TIMEOUT` | `--default-timeout` | `1800` | 1–604800 seconds |
 | `MCP_KALI_REVEAL_SENSITIVE_DATA` | `--reveal-sensitive-data` | `false` | Boolean |
-| `MCP_KALI_SYSTEM_DATA_DIR` | `--system-data-dir` | `~/.mcp-kali/share` | Directory |
+| `MCP_KALI_SYSTEM_DATA_DIR` | `--system-data-dir` | `~/.mcp-kali/etc` | Directory |
 | `MCP_KALI_CONFIG_DIR` | `--config-dir` | `~/.mcp-kali/etc` | Directory |
 | `MCP_KALI_DISABLE_EXECUTE_COMMAND` | `--disable-execute-command` | `false` | Boolean |
 | `MCP_KALI_PRIVILEGE_ELEVATION` | `--privilege-elevation` | `auto` | `auto` or `none` |
@@ -350,11 +349,40 @@ mcp-kali \
   --default-timeout 1800
 ```
 
-### Future system installation
+### Systemd installation
 
-`make install-local` is deliberately non-root. A future system installation
-will require a dedicated service user and create a reviewed systemd unit. Until
-then, run the server as the authorized local user from the per-user tree.
+`make install-local` remains deliberately non-root. For a system service, pick
+an existing authorized Kali user rather than running the server as root. That
+user must have the installed tools and passwordless sudo for any root-required
+Plugin tools it is expected to run.
+
+```bash
+sudo make install MCP_KALI_USER=kali MCP_KALI_GROUP=kali
+sudo make systemd-reload enable-system
+```
+
+`make install` detects its effective UID: as a regular user it runs the local
+installer; as root it performs the system install and requires
+`MCP_KALI_USER` to identify an existing authorized service account.
+`install-local` and `install-system` remain available for explicit automation.
+
+The root-only installer places binaries in `/usr/local/bin`, Plugin manifests
+and the capability catalog in `/etc/mcp-kali/plugins`, state in
+`/var/lib/mcp-kali/jobs`, config in `/etc/mcp-kali/mcp-kali.conf`, and a
+rendered `mcp-kali.service` in `/etc/systemd/system`. It refuses to create or
+guess the service user, and it does not enable the service automatically. Review
+the generated configuration and sudoers policy first. Use `make status-system`
+and `make logs-system` after enablement.
+
+The unit uses `Type=exec`, restart-on-failure, journald logging, `SIGTERM` for
+normal stop, and `ExecReload` to send `SIGHUP`. Its hardening intentionally does
+not enable `NoNewPrivileges`, `PrivateUsers`, or a restrictive capability set,
+because those would break the selected user's passwordless sudo path.
+
+Without an explicit `--config-file` or `MCP_KALI_CONFIG_FILE`, the binaries use
+`/etc/mcp-kali/mcp-kali.conf` when it exists; otherwise they retain the normal
+per-user `~/.mcp-kali/etc/mcp-kali.conf` fallback. This makes the same binary
+suitable for both service and standalone use.
 
 ### Runtime signals
 
