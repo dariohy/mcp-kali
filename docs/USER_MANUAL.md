@@ -378,6 +378,9 @@ The unit uses `Type=exec`, restart-on-failure, journald logging, `SIGTERM` for
 normal stop, and `ExecReload` to send `SIGHUP`. Its hardening intentionally does
 not enable `NoNewPrivileges`, `PrivateUsers`, or a restrictive capability set,
 because those would break the selected user's passwordless sudo path.
+`WorkingDirectory=~` resolves to the selected `User=` account's home directory;
+outside systemd, mcp-kali leaves the invoking process's working directory
+unchanged.
 
 Without an explicit `--config-file` or `MCP_KALI_CONFIG_FILE`, the binaries use
 `/etc/mcp-kali/mcp-kali.conf` when it exists; otherwise they retain the normal

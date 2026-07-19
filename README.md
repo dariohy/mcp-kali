@@ -139,7 +139,8 @@ template at `/etc/mcp-kali/mcp-kali.conf`, private state under
 `/var/lib/mcp-kali/jobs`, and the generated `mcp-kali.service` unit. Review the
 configuration and sudoers policy before enabling it. Use `make status-system`
 and `make logs-system` for operations; `systemctl reload mcp-kali` maps to
-`SIGHUP`.
+`SIGHUP`. The service runs from the selected service user's home directory;
+standalone runs retain the invoking shell's working directory.
 
 When no `--config-file` or `MCP_KALI_CONFIG_FILE` is selected, MCP Kali uses
 `/etc/mcp-kali/mcp-kali.conf` if it exists. If it does not, it falls back to the

@@ -8,7 +8,9 @@ After=network-online.target
 Type=exec
 User=@MCP_KALI_USER@
 Group=@MCP_KALI_GROUP@
-WorkingDirectory=/var/lib/mcp-kali
+# `~` resolves to the home directory of User=, so relative paths and tools run
+# with the same working directory as the selected service account.
+WorkingDirectory=~
 EnvironmentFile=-/etc/mcp-kali/mcp-kali.conf
 ExecStart=@MCP_KALI_BIN@ --config-file /etc/mcp-kali/mcp-kali.conf
 ExecReload=/bin/kill -HUP $MAINPID
