@@ -3,6 +3,7 @@ CLIENT_BIN := mcp-kali-client
 CARGO := cargo
 VERSION := $(shell awk -F '"' '/^version = / { print $$2; exit }' Cargo.toml)
 INSTALL_DIR ?= $(HOME)/.local/bin
+DATA_DIR ?= $(abspath $(INSTALL_DIR)/../share/mcp-kali)
 COMPLETION_DIR := target/completions
 SECURITY_DIR := target/security
 
@@ -22,7 +23,7 @@ help:
 	@echo "  run-server    Run a local development server"
 	@echo "  run-client    Run the stdio MCP client"
 	@echo "  completions   Generate completion scripts for both binaries"
-	@echo "  install-local Install both binaries under INSTALL_DIR"
+	@echo "  install-local Install binaries and Plugin data under the selected prefix"
 	@echo "  checksum      Generate target/release/SHA256SUMS"
 	@echo "  security      Run audit, dependency policy, and secret scan"
 	@echo "  sbom          Generate a CycloneDX JSON SBOM (cargo-cyclonedx required)"
@@ -52,7 +53,7 @@ release:
 verify: fmt-check check clippy test release
 
 run-server:
-	$(CARGO) run --bin $(SERVER_BIN) -- --state-dir ./var/jobs
+	$(CARGO) run --bin $(SERVER_BIN) -- --state-dir ./var/jobs --system-data-dir ./share/mcp-kali
 
 run-client:
 	$(CARGO) run --bin $(CLIENT_BIN) -- --server http://127.0.0.1:5000
@@ -72,8 +73,10 @@ completions: release
 
 install-local: release
 	mkdir -p "$(INSTALL_DIR)"
+	mkdir -p "$(DATA_DIR)"
 	install -m 0755 "target/release/$(SERVER_BIN)" "$(INSTALL_DIR)/$(SERVER_BIN)"
 	install -m 0755 "target/release/$(CLIENT_BIN)" "$(INSTALL_DIR)/$(CLIENT_BIN)"
+	cp -R share/mcp-kali/. "$(DATA_DIR)/"
 
 checksum: release
 	cd target/release && shasum -a 256 "$(SERVER_BIN)" "$(CLIENT_BIN)" > SHA256SUMS

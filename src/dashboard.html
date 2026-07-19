@@ -34,12 +34,13 @@
     code.full-command { margin-top:5px; white-space:pre-wrap; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; max-height:160px; }
     .output-title { margin:0 0 5px; color:#9aabb6; font-size:12px; } .output-title a { color:#9fd5ff; text-decoration:none; margin-left:8px; } .output-title a:hover { text-decoration:underline; } .output-warning { margin:0 0 8px; color:#ffd166; font-size:12px; } .empty { padding:32px; text-align:center; color:#9aabb6; }
     #notice { min-height:20px; color:#ffb4b4; } .refresh { color:#9aabb6; font-size:12px; }
+    a.runtime-link { color:#9fd5ff; text-decoration:none; } a.runtime-link:hover { text-decoration:underline; }
     @media (max-width: 850px) { .row { grid-template-columns: 34px 82px minmax(80px,1fr) auto; } .command,.elapsed { display:none; } .detail { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
   <header>
-    <div><h1>MCP Kali job control</h1><div class="muted">Live scheduler monitor and control plane</div></div>
+    <div><h1>MCP Kali job control</h1><div class="muted">Live scheduler monitor and declarative Plugin runtime · <a class="runtime-link" href="/api/plugins">Plugins</a> · <a class="runtime-link" href="/api/capabilities">Capabilities</a> · <a class="runtime-link" href="/api/plugins/diagnostics">Diagnostics</a></div></div>
     <div class="stats" id="stats"></div>
   </header>
   <div class="tabs">
@@ -54,7 +55,7 @@
   <section class="panel" id="history"></section>
 <script>
   const activeStates = new Set(['queued','running','paused']);
-  let jobs = [], currentTab = 'active', autoRefreshEnabled = false, autoRefreshTimer = null, lastUpdated = null, loading = false, listSignature = null;
+  let jobs = [], runtime = {plugins:0,tools:0,diagnostics:0}, currentTab = 'active', autoRefreshEnabled = false, autoRefreshTimer = null, lastUpdated = null, loading = false, listSignature = null;
   const expandedJobs = new Set();
   const activePanel = document.getElementById('active');
   const historyPanel = document.getElementById('history');
@@ -97,7 +98,7 @@
     const queued = activeJobs.filter(j => j.state === 'queued').sort((a,b) => new Date(a.created_at)-new Date(b.created_at));
     const activeNow = activeJobs.filter(j => j.state !== 'queued').sort((a,b) => new Date(a.created_at)-new Date(b.created_at));
     const finished = jobs.filter(j => !activeStates.has(j.state)).sort((a,b) => new Date(b.finished_at || b.created_at)-new Date(a.finished_at || a.created_at));
-    statsEl.innerHTML = `<span class="stat">Running <b>${activeNow.filter(j=>j.state==='running').length}</b></span><span class="stat">Paused <b>${activeNow.filter(j=>j.state==='paused').length}</b></span><span class="stat">Queued <b>${queued.length}</b></span><span class="stat">Finished <b>${finished.length}</b></span>`;
+    statsEl.innerHTML = `<span class="stat">Plugins <b>${runtime.plugins}</b></span><span class="stat">Tools <b>${runtime.tools}</b></span><span class="stat">Diagnostics <b>${runtime.diagnostics}</b></span><span class="stat">Running <b>${activeNow.filter(j=>j.state==='running').length}</b></span><span class="stat">Paused <b>${activeNow.filter(j=>j.state==='paused').length}</b></span><span class="stat">Queued <b>${queued.length}</b></span><span class="stat">Finished <b>${finished.length}</b></span>`;
     const signature = JSON.stringify([...activeNow, ...queued, ...finished].map(job => [job.id, job.state, job.tool, job.command]));
     if (signature !== listSignature) {
       activePanel.innerHTML = `<p class="summary">Running and paused jobs first; queued jobs follow in their dispatch order. Pause does not stop the configured wall-clock timeout.</p>${[...activeNow,...queued].map(j => jobCard(j, j.state === 'queued' ? queued.indexOf(j)+1 : '')).join('') || '<div class="empty">No active or queued jobs.</div>'}`;
@@ -116,7 +117,7 @@
   async function load() {
     if (loading) return;
     loading = true;
-    try { const response = await fetch('/api/jobs'); if (!response.ok) throw new Error(await response.text()); jobs = (await response.json()).jobs; render(); lastUpdated = new Date(); refreshStatus(); noticeEl.textContent = ''; }
+    try { const [jobsResponse,pluginsResponse,toolsResponse,diagnosticsResponse] = await Promise.all([fetch('/api/jobs'),fetch('/api/plugins'),fetch('/api/tools'),fetch('/api/plugins/diagnostics')]); if (!jobsResponse.ok) throw new Error(await jobsResponse.text()); jobs = (await jobsResponse.json()).jobs; runtime = {plugins:(await pluginsResponse.json()).plugins?.length || 0,tools:(await toolsResponse.json()).tools?.length || 0,diagnostics:(await diagnosticsResponse.json()).diagnostics?.length || 0}; render(); lastUpdated = new Date(); refreshStatus(); noticeEl.textContent = ''; }
     catch (error) { noticeEl.textContent = `Could not refresh jobs: ${error.message}`; }
     finally { loading = false; }
   }

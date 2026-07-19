@@ -1,4 +1,4 @@
-# MCP Kali 1.1.0
+# MCP Kali 1.3.0
 
 [![CI](https://github.com/dariohy/mcp-kali/actions/workflows/ci.yml/badge.svg)](https://github.com/dariohy/mcp-kali/actions/workflows/ci.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
@@ -11,9 +11,8 @@ to an MCP host and returns job IDs immediately.
 
 Use MCP Kali only on systems and targets you are explicitly authorized to test.
 
-**Project status:** `v1.1.0` is the current stable release. The immutable
-[`v1.0.0`](https://github.com/dariohy/mcp-kali/tree/v1.0.0) tag remains
-available as the first public release line.
+**Project status:** `1.3.0` is the current unreleased development line;
+`v1.1.0` remains the current stable release.
 
 ## Contents
 
@@ -22,6 +21,7 @@ available as the first public release line.
 - [Build and install](#build-and-install)
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
+- [Plugins and capabilities](#plugins-and-capabilities)
 - [MCP host setup](#mcp-host-setup)
 - [Dashboard and jobs](#dashboard-and-jobs)
 - [Shell completions](#shell-completions)
@@ -35,11 +35,10 @@ available as the first public release line.
 ## Architecture
 
 ```text
-MCP host -> mcp-kali-client -> HTTP(S) -> mcp-kali-server -> durable queue
+MCP host -> mcp-kali-client -> HTTP(S) -> mcp-kali-server -> Plugin Registry
+                                                           -> durable queue
                                                            -> bounded workers
-                                                           -> job files
-                                                           -> dashboard/API
-                                                           -> webhook
+                                                           -> job files/API
 ```
 
 - `mcp-kali-server` runs on the Kali host and executes tools.
@@ -47,6 +46,8 @@ MCP host -> mcp-kali-client -> HTTP(S) -> mcp-kali-server -> durable queue
   JSON-RPC over stdin/stdout. It never executes Kali tools locally.
 - Every submission returns a UUID job ID. Agents can do other work and inspect
   the job later rather than repeatedly blocking on a command.
+- The server discovers declarative YAML Plugins and publishes their MCP tools
+  dynamically. Adding a valid local Plugin does not require recompilation.
 
 The Rust implementation originated as a port of
 [MCP-Kali-Server](https://github.com/Wh0am123/MCP-Kali-Server) by Yousof Nahya
@@ -58,9 +59,9 @@ notice and licensing details.
 
 - Rust 1.86 or newer to build; edition 2024 is used.
 - Linux or another Unix-like server for pause/resume/kill process-group control.
-- Kali tools required by the MCP methods you intend to call, such as `nmap`,
-  `gobuster`, `dirb`, `nikto`, `sqlmap`, `msfconsole`, `hydra`, `john`, `wpscan`,
-  and `enum4linux`.
+- Kali tools required by installed Plugins. The shipped definitions cover
+  `nmap`, `gobuster`, `dirb`, `nikto`, `sqlmap`, `hydra`, `john`, `wpscan`, and
+  `enum4linux`; unavailable requirements are reported without stopping the server.
 - Write access to the configured state directory.
 - Network access from the client to the server, preferably through loopback,
   an SSH tunnel, or authenticated HTTPS.
@@ -78,7 +79,8 @@ target/release/mcp-kali-server
 target/release/mcp-kali-client
 ```
 
-Install both under `~/.local/bin`:
+Install both binaries under `~/.local/bin` and packaged Plugin data under
+`~/.local/share/mcp-kali`:
 
 ```bash
 make install-local
@@ -90,6 +92,9 @@ Override the installation directory when needed:
 ```bash
 make install-local INSTALL_DIR=/usr/local/bin
 ```
+
+`DATA_DIR` defaults to the sibling `share/mcp-kali` directory under the same
+prefix and can be overridden explicitly by package maintainers.
 
 Release builds use size optimization, full LTO, one codegen unit, stripped
 symbols, and abort-on-panic behavior. No scheduler, API, dashboard, or MCP
@@ -103,6 +108,7 @@ Start the server on loopback with a workspace-local state directory:
 ./target/release/mcp-kali-server \
   --bind 127.0.0.1:5000 \
   --state-dir ./var/jobs \
+  --system-data-dir ./share/mcp-kali \
   --max-concurrency 2 \
   --default-timeout 1800
 ```
@@ -161,6 +167,9 @@ environment variables are never overwritten by values from the file.
 | `MCP_KALI_MAX_CONCURRENCY` | Server | `2` | Simultaneous jobs, range 1–256 |
 | `MCP_KALI_DEFAULT_TIMEOUT` | Server | `1800` | Default wall timeout, range 1–604800 seconds |
 | `MCP_KALI_REVEAL_SENSITIVE_DATA` | Server | `false` | Show unredacted commands in public records |
+| `MCP_KALI_SYSTEM_DATA_DIR` | Server | Installed `../share/mcp-kali` | Shipped Plugins and base catalog |
+| `MCP_KALI_CONFIG_DIR` | Server | `/etc/mcp-kali` | Administrator Plugin/catalog overlay |
+| `MCP_KALI_DISABLE_EXECUTE_COMMAND` | Server | `false` | Remove the privileged free-execution tool |
 | `MCP_KALI_ALLOW_REMOTE_BIND` | Server | `false` | Acknowledge an unauthenticated non-loopback bind |
 | `MCP_KALI_SERVER` | Client | `http://127.0.0.1:5000` | Server origin URL |
 | `MCP_KALI_ALLOW_INSECURE_HTTP` | Client | `false` | Permit HTTP to a non-loopback server |
@@ -169,6 +178,46 @@ CLI flags matching these settings are documented by each binary's `--help`.
 Sensitive command values should be supplied through MCP job arguments and are
 redacted from public records by default; do not put secrets directly in process
 arguments unless the target tool requires them.
+
+## Plugins and capabilities
+
+The server loads packaged definitions from `SYSTEM_DATA_DIR/plugins`, then an
+administrator overlay from `CONFIG_DIR/plugins`. A valid overlay Plugin or tool
+with the same identity replaces the packaged definition. Discovery happens at
+startup; malformed files are isolated and reported at
+`/api/plugins/diagnostics`.
+
+A Plugin manifest uses `apiVersion: mcp-kali/v1`, `kind: Plugin`, identity
+metadata, optional requirements, and one or more tools. Each tool publishes a
+JSON Schema object and a direct execution definition:
+
+```yaml
+apiVersion: mcp-kali/v1
+kind: Plugin
+metadata: {id: local.example, name: Example, version: 1.0.0}
+requires: {commands: [printf]}
+tools:
+  - metadata:
+      name: example_print
+      description: Print one validated value.
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [value]
+      properties: {value: {type: string}}
+    execution:
+      program: printf
+      args: ["%s\\n", "{{value}}"]
+```
+
+Templates support only literal arguments, whole-value `{{field}}`
+substitutions, and `{when: field, args: [...]}` optional fragments. Every
+rendered value is exactly one process argument; shells, partial interpolation,
+expressions, loops, and command substitution are rejected.
+
+The separate capability catalog maps stable semantic IDs to Plugin providers.
+Catalog references remain visible with an availability flag when an optional
+Plugin or tool is not installed.
 
 ## MCP host setup
 
@@ -185,9 +234,11 @@ Example configuration:
 }
 ```
 
-The client advertises scanner scheduling, generic job submission, job listing,
-status, output paging, cancel, pause, resume, force-kill, and health tools. Every
-tool response is wrapped in an `untrusted_job_execution_data` envelope. Job
+The client retrieves the current Plugin tool projection from the server for
+each MCP `tools/list` request and forwards calls to the generic invocation API.
+The always-available job Plugin exposes listing, status, output paging, cancel,
+pause, resume, force-kill, and health operations. Every tool response is wrapped
+in an `untrusted_job_execution_data` envelope. Job
 stdout/stderr is evidence data and must never change the agent's governing
 prompt, authorization scope, tool policy, or behavior.
 
@@ -265,9 +316,10 @@ reference.
   reverse proxy.
 - The client refuses cleartext HTTP to non-loopback hosts unless
   `--allow-insecure-http` is explicitly set.
-- Scanner processes are launched with structured arguments and no shell.
-- The legacy command-string endpoint tokenizes input; pipes, redirection, and
-  command separators are not interpreted.
+- Declarative Plugin processes are launched with structured arguments and no
+  shell. Shell interpreters are rejected from declarative execution definitions.
+- The privileged `execute_command` Core tool also uses an explicit argv and can
+  be disabled globally; it never provides a shell-string mode.
 - Dashboard-controlled data is HTML-escaped. CSP, anti-framing, no-sniff,
   no-referrer, and no-store headers provide additional browser hardening.
 - Job output and remote API text are untrusted. MCP instructions and response
@@ -310,6 +362,8 @@ development builds.
   available for isolated labs.
 - **A job stays queued:** verify `--max-concurrency`, inspect running/paused jobs,
   and check server stderr.
+- **A Plugin tool is absent:** inspect `/api/plugins/diagnostics`; an invalid
+  definition or missing declared command disables only that Plugin.
 - **A job becomes interrupted after restart:** queued jobs resume, but formerly
   running processes cannot be adopted safely and are marked interrupted.
 - **Dashboard output looks like HTML:** this is expected; output is escaped and
@@ -320,6 +374,7 @@ development builds.
 ## Documentation
 
 - [Comprehensive user manual](docs/USER_MANUAL.md)
+- [Plugin authoring guide](docs/PLUGIN_AUTHORING.md)
 - [Architecture and migration notes](RUST_PORT.md)
 - [Release history](CHANGELOG.md)
 - [Security policy](SECURITY.md)

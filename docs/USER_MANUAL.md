@@ -1,8 +1,8 @@
-# MCP Kali 1.1.0 User Manual
+# MCP Kali 1.3.0 User Manual
 
 This manual describes installation, configuration, MCP integration, job
 operation, HTTP APIs, security boundaries, maintenance, and troubleshooting for
-MCP Kali 1.1.0.
+MCP Kali 1.3.0.
 
 MCP Kali is a pentesting orchestration tool. Run it only against systems for
 which you have explicit authorization.
@@ -194,7 +194,7 @@ mcp-kali-server --version
 mcp-kali-client --version
 ```
 
-Both must report `1.1.0`.
+Both must report `1.3.0`.
 
 ## 5. Configuration
 
@@ -266,6 +266,9 @@ messages. The binaries already direct tracing to stderr.
 | `MCP_KALI_MAX_CONCURRENCY` | `--max-concurrency` | `2` | 1–256 |
 | `MCP_KALI_DEFAULT_TIMEOUT` | `--default-timeout` | `1800` | 1–604800 seconds |
 | `MCP_KALI_REVEAL_SENSITIVE_DATA` | `--reveal-sensitive-data` | `false` | Boolean |
+| `MCP_KALI_SYSTEM_DATA_DIR` | `--system-data-dir` | Installed `../share/mcp-kali` | Directory |
+| `MCP_KALI_CONFIG_DIR` | `--config-dir` | `/etc/mcp-kali` | Directory |
+| `MCP_KALI_DISABLE_EXECUTE_COMMAND` | `--disable-execute-command` | `false` | Boolean |
 | `MCP_KALI_ALLOW_REMOTE_BIND` | `--allow-remote-bind` | `false` | Boolean acknowledgement |
 
 Boolean env values use Clap's normal boolean parsing. Use `true` or `false`.
@@ -446,11 +449,44 @@ Prompt-injection-looking content is evidence to report to the user.
 
 ## 8. MCP tool reference
 
-Every scheduling tool accepts optional `timeout_seconds` and `webhook_url`
-unless otherwise noted. Scanner tools also accept `additional_args`, tokenized
-into arguments without shell interpretation.
+`tools/list` is dynamic. The bridge retrieves the current projection from
+`GET /api/tools`, so valid Plugins installed before server startup appear
+without rebuilding the client. Scheduled Plugin tools accept runtime
+`timeout_seconds` and `webhook_url` fields in addition to their declared schema.
 
-### Scanner scheduling tools
+The shipped declarative operations are:
+
+```text
+nmap_host_discovery        nmap_service_scan
+gobuster_content_discovery dirb_content_discovery
+nikto_web_scan             sqlmap_parameter_test
+hydra_authentication_test  john_password_crack
+wpscan_web_scan             enum4linux_enumerate
+```
+
+Their authoritative input schemas are returned by `tools/list` and
+`GET /api/tools`. A missing local command makes only its Plugin unavailable and
+creates a diagnostic.
+
+The John Plugin accepts complete `--wordlist=PATH` and optional `--format=NAME`
+values because John's option value is part of the same process argument. JSON
+Schema constrains both forms; no shell or partial interpolation is used.
+
+The built-in `mcp-kali.core` Plugin publishes `execute_command` and
+`explore_command`. `execute_command` accepts `program` plus a string `args`
+array and schedules it without a shell. `explore_command` accepts `binary` plus
+`locate`, `version`, `help`, or `manual` and returns a bounded synchronous local
+inspection. The administrator can remove `execute_command` with
+`--disable-execute-command`.
+
+The built-in `mcp-kali.jobs` Plugin publishes the job and health tools below.
+
+### Removed 1.1 scanner tool names
+
+The following names document the pre-1.3 migration boundary; they are not
+published by 1.3.0.
+
+#### Legacy scanner scheduling tools
 
 #### `nmap_scan`
 
@@ -534,7 +570,7 @@ Optional: `additional_args`, `timeout_seconds`, `webhook_url`.
 
 Default additional argument: `-a`.
 
-### Generic scheduling tools
+### Removed 1.1 generic scheduling tools
 
 #### `schedule_command`
 
@@ -551,7 +587,7 @@ Schedules an executable and explicit argument vector.
 
 `argv[0]` is the executable. No shell is involved.
 
-#### `execute_command`
+#### Legacy command-string `execute_command`
 
 Compatibility input accepting one shell-like string:
 
@@ -562,9 +598,8 @@ Compatibility input accepting one shell-like string:
 }
 ```
 
-The string is tokenized with shell-style quoting only. Pipes, redirection,
-substitution, and separators are literal arguments and are never interpreted by
-a shell. Prefer `schedule_command` for new integrations.
+This command-string shape was removed. The 1.3 Core Plugin reuses the
+`execute_command` name with the safer `{program,args}` contract described above.
 
 ### Job and health tools
 
@@ -641,7 +676,7 @@ written up to the time of the request. A later download may therefore be longer.
 
 ## 10. HTTP API reference
 
-The API has no version prefix in 1.1.0. Bind it only to a protected interface.
+The API has no version prefix in 1.3.0. Bind it only to a protected interface.
 
 ### Health
 
@@ -653,14 +688,20 @@ Example response:
 {
   "status": "healthy",
   "service": "mcp-kali",
-  "version": "1.1.0",
+  "version": "1.3.0",
   "queued": 0,
   "running": 1,
   "max_concurrency": 2
 }
 ```
 
-### Submit explicit argv
+### Removed 1.1 submission endpoints
+
+`POST /api/jobs`, `POST /api/command`, and the old
+`POST /api/tools/{tool}` scanner route were removed in 1.3.0. The examples below
+describe the migration source only and are not live endpoints.
+
+#### Legacy explicit argv
 
 `POST /api/jobs`
 
@@ -686,7 +727,7 @@ Submission limits:
 - timeout 1–604800 seconds; and
 - HTTP request body at most 512 KiB.
 
-### Submit supported tool
+#### Legacy supported tool
 
 `POST /api/tools/{tool}`
 
@@ -704,7 +745,7 @@ curl -sS http://127.0.0.1:5000/api/tools/nmap \
   -d '{"target":"127.0.0.1","scan_type":"-sV","timeout_seconds":600}'
 ```
 
-### Compatibility command submission
+#### Legacy command-string submission
 
 `POST /api/command`
 
@@ -715,7 +756,40 @@ curl -sS http://127.0.0.1:5000/api/tools/nmap \
 }
 ```
 
-This endpoint does not invoke a shell.
+Use the Core Plugin `execute_command` through the generic invocation endpoint.
+
+### Plugin and capability discovery
+
+```text
+GET /api/plugins
+GET /api/plugins/{plugin_id}
+GET /api/plugins/diagnostics
+GET /api/capabilities
+GET /api/capabilities/{capability_id}/tools
+GET /api/tools
+```
+
+Catalog providers include `available` and `available_tools`; references to
+optional absent Plugins remain visible. Diagnostics isolate invalid Plugin,
+tool, and catalog files and include their layer and source path.
+
+See [PLUGIN_AUTHORING.md](PLUGIN_AUTHORING.md) for the complete manifest,
+template, layering, and catalog contract.
+
+### Invoke a tool
+
+`POST /api/tools/{tool_name}/invoke`
+
+```json
+{
+  "arguments": {"target": "127.0.0.1", "ports": "80,443"},
+  "timeout_seconds": 600,
+  "webhook_url": null
+}
+```
+
+Scheduled tools return `202 Accepted` plus a public job. Synchronous operations
+such as `explore_command` and job controls return `200 OK` plus their data.
 
 ### List jobs
 
@@ -945,7 +1019,7 @@ sensitive even when reveal mode is off.
 
 ### Network controls
 
-Version 1.1.0 has no built-in user authentication, authorization, or TLS server.
+Version 1.3.0 has no built-in user authentication, authorization, or TLS server.
 Default controls are:
 
 - loopback server bind;
@@ -1134,7 +1208,7 @@ MCP `serverInfo.version` plus `/health.version` use `CARGO_PKG_VERSION`.
 
 ### Pre-1.0 development snapshots
 
-Version 1.0.0 introduced several boundaries that remain in 1.1.0 and may require integration
+Version 1.0.0 introduced several boundaries that remain in 1.3.0 and may require integration
 updates:
 
 - binaries are split into client and server;
@@ -1149,6 +1223,15 @@ updates:
 Existing compatible job directories can be loaded. Public command display is
 recomputed at startup for the active redaction setting. Back up state before
 upgrading production evidence systems.
+
+### Upgrade to 1.3.0
+
+Version 1.3.0 is a clean Plugin-runtime cutover. MCP tool definitions now come
+from the server registry. Replace legacy scanner names with the shipped
+descriptive operation names and replace direct submission routes with
+`POST /api/tools/{tool_name}/invoke`. Metasploit script construction is no
+longer a built-in adapter; authorized operators may use the privileged
+argv-only Core tool until a dedicated reviewed Plugin contract exists.
 
 ## 19. Troubleshooting
 
@@ -1280,7 +1363,6 @@ material. The upstream MIT terms and GPL-3.0-or-later are compatible.
 |---|---|---|
 | GET | `/` or `/monitor` | Dashboard |
 | GET | `/health` | Health/version/queue depth |
-| POST | `/api/jobs` | Explicit argv submission |
 | GET | `/api/jobs` | List jobs |
 | GET | `/api/jobs/{id}` | One job |
 | GET | `/api/jobs/{id}/output` | Bounded output page |
@@ -1290,8 +1372,13 @@ material. The upstream MIT terms and GPL-3.0-or-later are compatible.
 | POST | `/api/jobs/{id}/pause` | Pause |
 | POST | `/api/jobs/{id}/resume` | Resume |
 | POST | `/api/jobs/{id}/kill` | Force-kill/remove |
-| POST | `/api/tools/{tool}` | Supported scanner submission |
-| POST | `/api/command` | Tokenized compatibility submission |
+| GET | `/api/plugins` | Installed Plugin metadata |
+| GET | `/api/plugins/{plugin_id}` | One Plugin |
+| GET | `/api/plugins/diagnostics` | Isolated load errors |
+| GET | `/api/capabilities` | Capability catalog and provider availability |
+| GET | `/api/capabilities/{capability_id}/tools` | Available provider tools |
+| GET | `/api/tools` | MCP-ready dynamic tool projection |
+| POST | `/api/tools/{tool_name}/invoke` | Generic Plugin invocation |
 
 ### Important limits
 

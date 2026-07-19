@@ -2,6 +2,7 @@ use anyhow::{Result, bail};
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::{Shell, generate};
 use mcp_kali::jobs::Scheduler;
+use mcp_kali::plugins::{PluginRegistry, default_system_data_dir};
 use std::{net::SocketAddr, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 
@@ -41,6 +42,22 @@ struct Cli {
     /// dashboard, and completion webhooks.
     #[arg(long, env = "MCP_KALI_REVEAL_SENSITIVE_DATA", default_value_t = false)]
     reveal_sensitive_data: bool,
+
+    /// Read-only packaged plugins and base capability catalog directory.
+    #[arg(long, env = "MCP_KALI_SYSTEM_DATA_DIR", default_value_os_t = default_system_data_dir())]
+    system_data_dir: PathBuf,
+
+    /// Administrator plugin and capability-catalog overlay directory.
+    #[arg(long, env = "MCP_KALI_CONFIG_DIR", default_value = "/etc/mcp-kali")]
+    config_dir: PathBuf,
+
+    /// Disable the privileged Core Plugin execute_command escape hatch.
+    #[arg(
+        long,
+        env = "MCP_KALI_DISABLE_EXECUTE_COMMAND",
+        default_value_t = false
+    )]
+    disable_execute_command: bool,
 
     /// Permit binding to a non-loopback address. The server has no built-in
     /// authentication; protect remote access with a firewall and private
@@ -105,5 +122,24 @@ async fn main() -> Result<()> {
         cli.reveal_sensitive_data,
     )
     .await?;
-    mcp_kali::api::serve(cli.bind, scheduler).await
+    let registry = PluginRegistry::load(
+        &cli.system_data_dir,
+        &cli.config_dir,
+        !cli.disable_execute_command,
+    );
+    for diagnostic in registry.diagnostics() {
+        tracing::warn!(
+            layer = %diagnostic.layer,
+            path = %diagnostic.path,
+            message = %diagnostic.message,
+            "plugin diagnostic"
+        );
+    }
+    tracing::info!(
+        plugins = registry.plugins().len(),
+        tools = registry.tools().len(),
+        diagnostics = registry.diagnostics().len(),
+        "plugin registry loaded"
+    );
+    mcp_kali::api::serve(cli.bind, scheduler, registry).await
 }

@@ -5,8 +5,25 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Declarative YAML Plugin discovery with layered packaged and administrator
+  data, JSON Schema validation, safe argv templates, diagnostics, and dynamic
+  MCP tool projection.
+- Built-in Core Plugin for privileged argv execution and bounded local command
+  exploration, plus a built-in job-management Plugin.
+- Separate Capability Catalog endpoints with provider availability resolution.
+- Packaged declarative definitions for Nmap, Gobuster, Dirb, Nikto, SQLmap,
+  Hydra, John the Ripper, WPScan, and enum4linux.
+
 ### Changed
 
+- Set the unreleased development version to 1.3.0.
+- Replaced hard-coded scanner and command submission routes with generic Plugin
+  discovery and `POST /api/tools/{tool_name}/invoke`.
+- Made the MCP bridge retrieve tool definitions from the server at `tools/list`.
+- Extended local installation to place packaged runtime data under the install
+  prefix's `share/mcp-kali` directory.
 - Renamed the public repository from `dariohy/mpc-kali` to
   `dariohy/mcp-kali` and updated canonical project links.
 

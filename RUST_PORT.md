@@ -1,8 +1,28 @@
-# MCP Kali 1.0.0 architecture and Rust migration notes
+# MCP Kali architecture and Rust migration notes
 
 This document records why the Rust design differs from the earlier Python MCP
 Kali Server and describes the implementation boundaries that maintainers must
 preserve. User-facing instructions are in [docs/USER_MANUAL.md](docs/USER_MANUAL.md).
+
+## Version 1.3 Plugin runtime
+
+Version 1.3 moves utility-specific knowledge out of Rust and into declarative
+YAML Plugins. At startup the server registers the built-in `mcp-kali.core` and
+`mcp-kali.jobs` Plugins, loads packaged definitions, overlays administrator
+definitions, validates JSON Schemas and safe argv templates, then resolves the
+separate Capability Catalog. The MCP bridge retrieves `/api/tools`; it no
+longer contains a scanner catalogue or scanner-specific routing.
+
+The scheduler remains the execution boundary. A declarative invocation renders
+one literal program plus one argument per template value and submits the result
+through the same persistence, concurrency, process-group, timeout, output, and
+webhook machinery. Shell interpreters, partial interpolation, and expression
+evaluation are rejected from declarative definitions.
+
+Plugin load failures are isolated and public through diagnostics. A valid
+administrator overlay replaces matching packaged Plugin/tool identities.
+Discovery is startup-only in 1.3; hot reload and executable extension ABIs are
+out of scope.
 
 ## Motivation
 
@@ -31,12 +51,13 @@ MCP host -> mcp-kali-client -> HTTP(S) -> mcp-kali-server
 src/bin/client.rs  CLI/config bootstrap for the stdio MCP client
 src/bin/server.rs  CLI/config bootstrap for the scheduler/API server
 src/config.rs      shared env-file selection and permission checks
-src/mcp.rs         MCP JSON-RPC transport, tool catalogue, typed API forwarding
+src/mcp.rs         MCP JSON-RPC transport and dynamic API forwarding
 src/api.rs         Axum routes, validation adapters, dashboard response headers
 src/jobs.rs        durable scheduler, process groups, output files, webhooks
-src/commands.rs    supported scanner-to-argv construction and validation
+src/plugins.rs     Plugin registry, catalogs, schemas, templates, core operations
 src/models.rs      stable serialized job, output, and health models
 src/dashboard.html embedded dashboard HTML/CSS/JavaScript
+share/mcp-kali/    packaged Plugin manifests and base Capability Catalog
 ```
 
 `Cargo.toml` is the version source of truth. Both Clap binaries, MCP
@@ -48,7 +69,7 @@ src/dashboard.html embedded dashboard HTML/CSS/JavaScript
 scheduler calls `tokio::process::Command::new(argv[0]).args(argv[1..])`. It does
 not invoke a shell.
 
-The `/api/command` and MCP `execute_command` compatibility shapes perform
+Through version 1.1, `/api/command` and the old MCP `execute_command` shape performed
 shell-style lexical splitting only. Pipes, redirection, substitution, and
 separators remain literal arguments. New integrations should use argv directly.
 
@@ -184,7 +205,6 @@ value.
 ```text
 GET  / and /monitor
 GET  /health
-POST /api/jobs
 GET  /api/jobs
 GET  /api/jobs/{id}
 GET  /api/jobs/{id}/output
@@ -194,12 +214,18 @@ POST /api/jobs/{id}/cancel
 POST /api/jobs/{id}/pause
 POST /api/jobs/{id}/resume
 POST /api/jobs/{id}/kill
-POST /api/tools/{tool}
-POST /api/command
+GET  /api/plugins
+GET  /api/plugins/{plugin_id}
+GET  /api/plugins/diagnostics
+GET  /api/capabilities
+GET  /api/capabilities/{capability_id}/tools
+GET  /api/tools
+POST /api/tools/{tool_name}/invoke
 ```
 
-Submission returns `202 Accepted`. State conflicts return `409`. Public job
-records never serialize private argv.
+Scheduled invocation returns `202 Accepted`; synchronous runtime operations
+return `200`. State conflicts return `409`. Public job records never serialize
+private argv.
 
 ## Release engineering
 
