@@ -168,7 +168,8 @@ uninstall-system:
 install-system: release
 	@test "$$(id -u)" -eq 0 || { echo "install-system must run as root" >&2; exit 2; }
 	@test -n "$(MCP_KALI_USER)" || { echo "MCP_KALI_USER is required for a system install" >&2; exit 2; }
-	@case "$(MCP_KALI_USER):$(MCP_KALI_GROUP)" in (*[!A-Za-z0-9_.-]*|:) echo "MCP_KALI_USER and MCP_KALI_GROUP must be simple account names" >&2; exit 2;; esac
+	@case "$(MCP_KALI_USER)" in ""|*[!A-Za-z0-9_.-]*) echo "MCP_KALI_USER must be a simple account name" >&2; exit 2;; esac
+	@case "$(MCP_KALI_GROUP)" in ""|*[!A-Za-z0-9_.-]*) echo "MCP_KALI_GROUP must be a simple account name" >&2; exit 2;; esac
 	@id -u "$(MCP_KALI_USER)" >/dev/null 2>&1 || { echo "service user $(MCP_KALI_USER) does not exist; create or select an authorized account" >&2; exit 2; }
 	@getent group "$(MCP_KALI_GROUP)" >/dev/null 2>&1 || { echo "service group $(MCP_KALI_GROUP) does not exist" >&2; exit 2; }
 	install -d -m 0755 "$(SYSTEM_BIN_DIR)" "$(SYSTEM_CONFIG_DIR)/plugins" "$(SYSTEMD_UNIT_DIR)"
