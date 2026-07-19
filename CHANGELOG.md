@@ -25,6 +25,8 @@ All notable changes to MCP Kali are documented here. The project follows
   the top-level `plugins/` directory.
 - Added focused `make client` and `make client-install` workflows for building
   and locally installing only `mcp-kali-bridge`.
+- Unified `make uninstall` workflow for removing either a per-user installation
+  or, when run as root, a systemd-backed system installation.
 
 ### Changed
 
@@ -163,7 +165,8 @@ All notable changes to MCP Kali are documented here. The project follows
 - There is no automatic job-retention policy; operators must manage the private
   state directory according to their evidence-retention requirements.
 
-[Unreleased]: https://github.com/dariohy/mcp-kali/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/dariohy/mcp-kali/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/dariohy/mcp-kali/releases/tag/v2.1.0
 [2.0.0]: https://github.com/dariohy/mcp-kali/releases/tag/v2.0.0
 [1.1.0]: https://github.com/dariohy/mcp-kali/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dariohy/mcp-kali/releases/tag/v1.0.0

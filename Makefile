@@ -23,7 +23,8 @@ SYSTEM_UNIT_FILE := $(SYSTEMD_UNIT_DIR)/mcp-kali.service
 
 .PHONY: help fmt fmt-check check clippy test build client release verify run-server run-client \
 	completions client-install install-local checksum security sbom clean \
-	install install-system systemd-reload enable-system disable-system status-system logs-system
+	install install-local install-system uninstall uninstall-local uninstall-system \
+	systemd-reload enable-system disable-system status-system logs-system
 
 help:
 	@echo "MCP Kali $(VERSION) development and release targets"
@@ -43,6 +44,7 @@ help:
 	@echo "  install       Install locally as a user, or system-wide as root"
 	@echo "  install-local Create a self-contained per-user installation under ~/.mcp-kali"
 	@echo "  install-system Install binaries, data, config template, and systemd unit (root; existing service user required)"
+	@echo "  uninstall     Remove the local user install, or the system install as root"
 	@echo "  systemd-reload Reload systemd unit files after install-system"
 	@echo "  enable-system  Enable and start mcp-kali.service"
 	@echo "  disable-system Disable and stop mcp-kali.service"
@@ -135,6 +137,33 @@ install:
 	else \
 		$(MAKE) install-local; \
 	fi
+
+uninstall:
+	@if [ "$$(id -u)" -eq 0 ]; then \
+		$(MAKE) uninstall-system; \
+	else \
+		$(MAKE) uninstall-local; \
+	fi
+
+uninstall-local:
+	@test "$$(id -u)" -ne 0 || { echo "uninstall-local is for a non-root user; use make uninstall as root for a system install" >&2; exit 2; }
+	@case "$(MCP_KALI_HOME)" in ""|/|"$(HOME)") echo "refusing unsafe MCP_KALI_HOME=$(MCP_KALI_HOME)" >&2; exit 2;; esac
+	@for binary in "$(SERVER_BIN)" "$(CLIENT_BIN)"; do \
+		link="$(LOCAL_BIN_DIR)/$$binary"; expected="$(abspath $(INSTALL_DIR))/$$binary"; \
+		if [ -L "$$link" ] && [ "$$(readlink "$$link")" = "$$expected" ]; then rm "$$link"; fi; \
+	done
+	rm -rf "$(MCP_KALI_HOME)"
+
+uninstall-system:
+	@test "$$(id -u)" -eq 0 || { echo "uninstall-system must run as root" >&2; exit 2; }
+	@case "$(SYSTEM_CONFIG_DIR)" in ""|/) echo "refusing unsafe SYSTEM_CONFIG_DIR=$(SYSTEM_CONFIG_DIR)" >&2; exit 2;; esac
+	@case "$(SYSTEM_STATE_DIR)" in ""|/) echo "refusing unsafe SYSTEM_STATE_DIR=$(SYSTEM_STATE_DIR)" >&2; exit 2;; esac
+	@if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files --no-legend mcp-kali.service 2>/dev/null | grep -q '^mcp-kali.service'; then \
+		systemctl disable --now mcp-kali.service; \
+	fi
+	rm -f "$(SYSTEM_UNIT_FILE)" "$(SYSTEM_BIN_DIR)/$(SERVER_BIN)" "$(SYSTEM_BIN_DIR)/$(CLIENT_BIN)"
+	@if command -v systemctl >/dev/null 2>&1; then systemctl daemon-reload; fi
+	rm -rf "$(SYSTEM_CONFIG_DIR)" "$(SYSTEM_STATE_DIR)"
 
 install-system: release
 	@test "$$(id -u)" -eq 0 || { echo "install-system must run as root" >&2; exit 2; }

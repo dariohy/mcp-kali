@@ -1,4 +1,4 @@
-# MCP Kali 2.0.0
+# MCP Kali 2.1.0
 
 [![CI](https://github.com/dariohy/mcp-kali/actions/workflows/ci.yml/badge.svg)](https://github.com/dariohy/mcp-kali/actions/workflows/ci.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
@@ -11,7 +11,7 @@ to an MCP host and returns job IDs immediately.
 
 Use MCP Kali only on systems and targets you are explicitly authorized to test.
 
-**Project status:** `v2.0.0` is the current stable release.
+**Project status:** `v2.1.0` is the current stable release.
 
 ## Contents
 
@@ -124,6 +124,11 @@ make install-local MCP_KALI_HOME=/path/to/mcp-kali
 Set `MCP_KALI_HOME=/path/to/mcp-kali` when running a relocated installation.
 `install-local` intentionally refuses root: system-wide service installation
 uses a separate, explicit workflow.
+
+To remove an installation, use `make uninstall`. As a regular user, it removes
+the selected `MCP_KALI_HOME` tree and only matching `~/.local/bin` symlinks. As
+root, it stops and disables `mcp-kali.service`, then removes the system
+binaries, configuration, and durable job state.
 
 ### Systemd installation (Kali/Linux)
 

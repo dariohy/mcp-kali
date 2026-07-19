@@ -1,8 +1,8 @@
-# MCP Kali 2.0.0 User Manual
+# MCP Kali 2.1.0 User Manual
 
 This manual describes installation, configuration, MCP integration, job
 operation, HTTP APIs, security boundaries, maintenance, and troubleshooting for
-MCP Kali 2.0.0.
+MCP Kali 2.1.0.
 
 MCP Kali is a pentesting orchestration tool. Run it only against systems for
 which you have explicit authorization.
@@ -210,8 +210,20 @@ make install-local MCP_KALI_HOME=/path/to/mcp-kali
 ```
 
 Set the same `MCP_KALI_HOME` value when running a relocated installation.
-`install-local` refuses root. System-wide installation, a dedicated service
-user, and a systemd unit are intentionally deferred to a later release.
+`install-local` refuses root. For a system-wide installation, choose an
+existing authorized service account and run `make install MCP_KALI_USER=<user>`
+as root.
+
+### Uninstall
+
+```bash
+make uninstall
+```
+
+As a regular user, this removes the selected `MCP_KALI_HOME` installation and
+only `~/.local/bin` symlinks that still point to its binaries. As root, it
+stops and disables `mcp-kali.service`, removes the system binaries and unit,
+then removes `/etc/mcp-kali` and the configured durable job-state directory.
 
 ### Verify installed versions
 
@@ -220,7 +232,7 @@ mcp-kali --version
 mcp-kali-bridge --version
 ```
 
-Both must report `2.0.0`.
+Both must report `2.1.0`.
 
 ## 5. Configuration
 
@@ -767,7 +779,7 @@ written up to the time of the request. A later download may therefore be longer.
 
 ## 10. HTTP API reference
 
-The API has no version prefix in 2.0.0. Bind it only to a protected interface.
+The API has no version prefix in 2.1.0. Bind it only to a protected interface.
 
 ### Health
 
@@ -779,7 +791,7 @@ Example response:
 {
   "status": "healthy",
   "service": "mcp-kali",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "queued": 0,
   "running": 1,
   "max_concurrency": 2
@@ -1110,7 +1122,7 @@ sensitive even when reveal mode is off.
 
 ### Network controls
 
-Version 2.0.0 has no built-in user authentication, authorization, or TLS server.
+Version 2.1.0 has no built-in user authentication, authorization, or TLS server.
 Default controls are:
 
 - loopback server bind;
@@ -1299,7 +1311,7 @@ MCP `serverInfo.version` plus `/health.version` use `CARGO_PKG_VERSION`.
 
 ### Pre-1.0 development snapshots
 
-Version 1.0.0 introduced several boundaries that remain in 2.0.0 and may require integration
+Version 1.0.0 introduced several boundaries that remain in 2.1.0 and may require integration
 updates:
 
 - binaries are split into client and server;
