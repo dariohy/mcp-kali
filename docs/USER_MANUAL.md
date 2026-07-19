@@ -37,7 +37,7 @@ MCP Kali separates agent interaction from process execution:
 
 ```text
 ┌──────────┐   stdio MCP    ┌─────────────────┐     HTTP(S)     ┌─────────────────┐
-│ MCP host │ ─────────────> │ mpc-kali-bridge │ ──────────────> │ mpc-kali │
+│ MCP host │ ─────────────> │ mcp-kali-bridge │ ──────────────> │ mcp-kali │
 └──────────┘                └─────────────────┘                  └────────┬────────┘
                                                                          │
                                               ┌──────────────────────────┼──────────┐
@@ -49,7 +49,7 @@ MCP Kali separates agent interaction from process execution:
                                      stdout/stderr job files
 ```
 
-### `mpc-kali`
+### `mcp-kali`
 
 The server belongs on the Kali machine. It:
 
@@ -62,7 +62,7 @@ The server belongs on the Kali machine. It:
 - recovers queued metadata after restart; and
 - optionally sends terminal job records to HTTPS webhooks.
 
-### `mpc-kali-bridge`
+### `mcp-kali-bridge`
 
 The client belongs beside the MCP host. It:
 
@@ -149,8 +149,8 @@ cargo build --release
 The resulting files are:
 
 ```text
-target/release/mpc-kali
-target/release/mpc-kali-bridge
+target/release/mcp-kali
+target/release/mcp-kali-bridge
 ```
 
 The release profile prioritizes compact distribution binaries:
@@ -190,8 +190,8 @@ Add its binary directory to `PATH` if necessary:
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-The installer creates or updates `~/.local/bin/mpc-kali` and
-`~/.local/bin/mpc-kali-bridge` symlinks to the self-contained installation. It
+The installer creates or updates `~/.local/bin/mcp-kali` and
+`~/.local/bin/mcp-kali-bridge` symlinks to the self-contained installation. It
 refuses to overwrite a regular file at either path.
 
 Use another self-contained user directory:
@@ -207,8 +207,8 @@ user, and a systemd unit are intentionally deferred to a later release.
 ### Verify installed versions
 
 ```bash
-mpc-kali --version
-mpc-kali-bridge --version
+mcp-kali --version
+mcp-kali-bridge --version
 ```
 
 Both must report `2.0.0`.
@@ -235,7 +235,7 @@ The default configuration file is:
 Choose another path with either:
 
 ```bash
-mpc-kali --config-file /path/to/mcp-kali.conf
+mcp-kali --config-file /path/to/mcp-kali.conf
 ```
 
 or:
@@ -267,8 +267,8 @@ install -m 644 examples/mcp-kali.conf.example ~/.mcp-kali/etc/mcp-kali.conf
 Examples:
 
 ```bash
-RUST_LOG=mcp_kali=debug,tower_http=info mpc-kali
-RUST_LOG=mcp_kali=debug mpc-kali-bridge
+RUST_LOG=mcp_kali=debug,tower_http=info mcp-kali
+RUST_LOG=mcp_kali=debug mcp-kali-bridge
 ```
 
 Never configure client logs to stdout: stdout is reserved for MCP protocol
@@ -309,13 +309,13 @@ replaced with `[REDACTED]` in the public command display. The private
 Enable reveal mode only in a controlled lab:
 
 ```bash
-mpc-kali --reveal-sensitive-data
+mcp-kali --reveal-sensitive-data
 ```
 
 or:
 
 ```bash
-MCP_KALI_REVEAL_SENSITIVE_DATA=true mpc-kali
+MCP_KALI_REVEAL_SENSITIVE_DATA=true mcp-kali
 ```
 
 Reveal mode affects the API, dashboard, and completion webhook record. It does
@@ -326,7 +326,7 @@ not make stored job data safe to share.
 ### Development or single-host deployment
 
 ```bash
-mpc-kali \
+mcp-kali \
   --bind 127.0.0.1:5000 \
   --state-dir ./var/jobs \
   --max-concurrency 2 \
@@ -344,7 +344,7 @@ then, run the server as the authorized local user from the per-user tree.
 This is the recommended two-host design. Keep the server on loopback:
 
 ```bash
-mpc-kali --bind 127.0.0.1:5000
+mcp-kali --bind 127.0.0.1:5000
 ```
 
 From the client host:
@@ -356,7 +356,7 @@ ssh -N -L 5000:127.0.0.1:5000 kali-user@kali-host
 Then configure the client with the local tunnel endpoint:
 
 ```bash
-mpc-kali-bridge --server http://127.0.0.1:5000
+mcp-kali-bridge --server http://127.0.0.1:5000
 ```
 
 ### Non-loopback bind
@@ -365,7 +365,7 @@ The server has no built-in authentication. It refuses a non-loopback bind unless
 you explicitly acknowledge the risk:
 
 ```bash
-mpc-kali --bind 10.10.10.5:5000 --allow-remote-bind
+mcp-kali --bind 10.10.10.5:5000 --allow-remote-bind
 ```
 
 Do this only inside an isolated, access-controlled network with firewall rules,
@@ -376,7 +376,7 @@ account and read job data.
 The client separately refuses cleartext remote HTTP unless explicitly allowed:
 
 ```bash
-mpc-kali-bridge \
+mcp-kali-bridge \
   --server http://10.10.10.5:5000 \
   --allow-insecure-http
 ```
@@ -391,7 +391,7 @@ That override is intended only for isolated labs.
 {
   "mcpServers": {
     "mcp-kali": {
-      "command": "/absolute/path/to/mpc-kali-bridge",
+      "command": "/absolute/path/to/mcp-kali-bridge",
       "args": ["--server", "http://127.0.0.1:5000"]
     }
   }
@@ -632,13 +632,18 @@ http://127.0.0.1:5000/monitor
 
 ### Header
 
-The counters show running, paused, queued, and finished jobs.
+The counters show registered Plugins, published tools, unavailable-definition
+diagnostics, and running, paused, queued, and finished jobs.
 
 ### Tabs
 
 - **Active & queue:** running and paused jobs first, followed by queued jobs in
   dispatch order.
 - **Finished history:** newest terminal jobs first.
+- **Tools:** registered Plugins and tools, their declared command requirements,
+  and startup diagnostics. A missing required executable prevents only that
+  Plugin from being published through MCP; the server and other Plugins
+  continue running.
 
 ### Compact job row
 
@@ -1096,8 +1101,8 @@ cat target/release/SHA256SUMS
 Sign private releases with approved tools when required, for example:
 
 ```bash
-minisign -Sm target/release/mpc-kali
-minisign -Sm target/release/mpc-kali-bridge
+minisign -Sm target/release/mcp-kali
+minisign -Sm target/release/mcp-kali-bridge
 ```
 
 Signing keys and signatures are outside the default build workflow.
@@ -1120,8 +1125,8 @@ target/completions/
 
 ```bash
 mkdir -p ~/.zfunc
-mpc-kali completions zsh > ~/.zfunc/_mpc-kali
-mpc-kali-bridge completions zsh > ~/.zfunc/_mpc-kali-bridge
+mcp-kali completions zsh > ~/.zfunc/_mcp-kali
+mcp-kali-bridge completions zsh > ~/.zfunc/_mcp-kali-bridge
 ```
 
 Add this to `~/.zshrc` if needed:
@@ -1135,15 +1140,15 @@ compinit
 ### Bash
 
 ```bash
-mpc-kali completions bash > ~/.local/share/bash-completion/completions/mpc-kali
-mpc-kali-bridge completions bash > ~/.local/share/bash-completion/completions/mpc-kali-bridge
+mcp-kali completions bash > ~/.local/share/bash-completion/completions/mcp-kali
+mcp-kali-bridge completions bash > ~/.local/share/bash-completion/completions/mcp-kali-bridge
 ```
 
 ### Fish
 
 ```fish
-mpc-kali completions fish > ~/.config/fish/completions/mpc-kali.fish
-mpc-kali-bridge completions fish > ~/.config/fish/completions/mpc-kali-bridge.fish
+mcp-kali completions fish > ~/.config/fish/completions/mcp-kali.fish
+mcp-kali-bridge completions fish > ~/.config/fish/completions/mcp-kali-bridge.fish
 ```
 
 PowerShell and Elvish output are available using `powershell` and `elvish` as the
@@ -1254,7 +1259,7 @@ The default `~/.mcp-kali/var/jobs` is created by `make install-local`. For an
 ad-hoc development run:
 
 ```bash
-mpc-kali --state-dir ./var/jobs
+mcp-kali --state-dir ./var/jobs
 ```
 
 ### Non-loopback bind refused
@@ -1262,7 +1267,7 @@ mpc-kali --state-dir ./var/jobs
 Use loopback and SSH. If remote binding is explicitly required and protected:
 
 ```bash
-mpc-kali --bind 10.10.10.5:5000 --allow-remote-bind
+mcp-kali --bind 10.10.10.5:5000 --allow-remote-bind
 ```
 
 ### Client refuses remote HTTP
@@ -1270,7 +1275,7 @@ mpc-kali --bind 10.10.10.5:5000 --allow-remote-bind
 Use an `https://` origin or SSH tunnel. For an isolated lab only:
 
 ```bash
-mpc-kali-bridge --server http://10.10.10.5:5000 --allow-insecure-http
+mcp-kali-bridge --server http://10.10.10.5:5000 --allow-insecure-http
 ```
 
 ### Job remains queued
@@ -1300,7 +1305,7 @@ expected state; action conflicts return HTTP `409`.
 ### MCP host cannot start client
 
 - Use an absolute binary path.
-- Run `mpc-kali-bridge --version` as the same account.
+- Run `mcp-kali-bridge --version` as the same account.
 - Ensure the MCP configuration uses the client binary, not the server.
 - Confirm all diagnostics stay on stderr.
 
@@ -1352,12 +1357,12 @@ material. The upstream MIT terms and GPL-3.0-or-later are compatible.
 
 | Command | Result |
 |---|---|
-| `mpc-kali --help` | Server options |
-| `mpc-kali --version` | Canonical package version |
-| `mpc-kali completions SHELL` | Completion script on stdout |
-| `mpc-kali-bridge --help` | Bridge options |
-| `mpc-kali-bridge --version` | Canonical package version |
-| `mpc-kali-bridge completions SHELL` | Completion script on stdout |
+| `mcp-kali --help` | Server options |
+| `mcp-kali --version` | Canonical package version |
+| `mcp-kali completions SHELL` | Completion script on stdout |
+| `mcp-kali-bridge --help` | Bridge options |
+| `mcp-kali-bridge --version` | Canonical package version |
+| `mcp-kali-bridge completions SHELL` | Completion script on stdout |
 
 ### API endpoints
 

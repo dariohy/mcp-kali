@@ -1,5 +1,5 @@
-SERVER_BIN := mpc-kali
-CLIENT_BIN := mpc-kali-bridge
+SERVER_BIN := mcp-kali
+CLIENT_BIN := mcp-kali-bridge
 CARGO := cargo
 VERSION := $(shell awk -F '"' '/^version = / { print $$2; exit }' Cargo.toml)
 MCP_KALI_HOME ?= $(HOME)/.mcp-kali

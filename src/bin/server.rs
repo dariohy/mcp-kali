@@ -12,7 +12,7 @@ use tracing_subscriber::EnvFilter;
 /// Kali-side scheduler, API, and job-control dashboard.
 #[derive(Parser)]
 #[command(
-    name = "mpc-kali",
+    name = "mcp-kali",
     version,
     about = "Kali-side job scheduler, HTTP API, and dashboard"
 )]
@@ -88,7 +88,7 @@ async fn main() -> Result<()> {
         generate(
             shell,
             &mut Cli::command(),
-            "mpc-kali",
+            "mcp-kali",
             &mut std::io::stdout(),
         );
         return Ok(());

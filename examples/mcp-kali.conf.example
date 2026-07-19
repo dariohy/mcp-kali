@@ -5,7 +5,7 @@
 # Shared configuration
 RUST_LOG=mcp_kali=info,tower_http=info
 
-# mpc-kali. Uncomment only to override the user-install defaults.
+# mcp-kali. Uncomment only to override the user-install defaults.
 # MCP_KALI_BIND=127.0.0.1:5000
 # MCP_KALI_HOME=/home/your-user/.mcp-kali
 # MCP_KALI_STATE_DIR=/home/your-user/.mcp-kali/var/jobs
@@ -19,7 +19,7 @@ MCP_KALI_DEFAULT_TIMEOUT=1800
 MCP_KALI_REVEAL_SENSITIVE_DATA=false
 MCP_KALI_ALLOW_REMOTE_BIND=false
 
-# mpc-kali-bridge
+# mcp-kali-bridge
 MCP_KALI_SERVER=http://127.0.0.1:5000
 MCP_KALI_ALLOW_INSECURE_HTTP=false
 

@@ -34,7 +34,7 @@ request until completion and had no durable identity or lifecycle controls.
 Version 1.0.0 separates submission, execution, monitoring, and MCP transport:
 
 ```text
-MCP host -> mpc-kali-bridge -> HTTP(S) -> mpc-kali
+MCP host -> mcp-kali-bridge -> HTTP(S) -> mcp-kali
                                              |
                        +---------------------+---------------------+
                        |                     |                     |

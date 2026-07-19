@@ -15,11 +15,11 @@ name = "mcp_kali"
 path = "src/lib.rs"
 
 [[bin]]
-name = "mpc-kali"
+name = "mcp-kali"
 path = "src/bin/server.rs"
 
 [[bin]]
-name = "mpc-kali-bridge"
+name = "mcp-kali-bridge"
 path = "src/bin/client.rs"
 
 [dependencies]

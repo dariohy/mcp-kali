@@ -15,9 +15,13 @@ All notable changes to MCP Kali are documented here. The project follows
 - Separate Capability Catalog endpoints with provider availability resolution.
 - Packaged declarative definitions for Nmap, Gobuster, Dirb, Nikto, SQLmap,
   Hydra, John the Ripper, WPScan, and enum4linux.
+- Monitor Tools view for registered Plugins/tools, declared command
+  requirements, and isolated unavailable-Plugin diagnostics.
 
 ### Changed
 
+- Restore the public binary names to `mcp-kali` and `mcp-kali-bridge`; the
+  brief `mpc-*` spelling was erroneous.
 - `make install-local` now creates a self-contained non-root user installation
   under `~/.mcp-kali` with `bin`, `etc`, `share/plugins`, and `var/jobs`.
 - User installation creates or updates safe `~/.local/bin` symlinks for both
@@ -40,8 +44,8 @@ All notable changes to MCP Kali are documented here. The project follows
 
 - Legacy `--env-file`, `MCP_KALI_ENV_FILE`, `mcp-kali.env`, and
   `~/.envs/.env_mcp-kali` configuration support.
-- `mcp-kali-server` and `mcp-kali-client` binary names; use `mpc-kali` and
-  `mpc-kali-bridge` instead.
+- Erroneous `mpc-kali` and `mpc-kali-bridge` binary names; use `mcp-kali` and
+  `mcp-kali-bridge` instead.
 
 ## [1.1.0] - 2026-07-18
 

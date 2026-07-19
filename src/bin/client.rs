@@ -5,19 +5,19 @@ use reqwest::Url;
 use std::{net::IpAddr, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 
-/// Local stdio MCP bridge that talks to an mpc-kali instance.
+/// Local stdio MCP bridge that talks to an mcp-kali instance.
 #[derive(Parser)]
 #[command(
-    name = "mpc-kali-bridge",
+    name = "mcp-kali-bridge",
     version,
-    about = "Local stdio MCP bridge for mpc-kali"
+    about = "Local stdio MCP bridge for mcp-kali"
 )]
 struct Cli {
     /// Load defaults from this configuration file. Shell variables and CLI flags override it.
     #[arg(long, env = "MCP_KALI_CONFIG_FILE", global = true, value_name = "PATH")]
     config_file: Option<PathBuf>,
 
-    /// Base URL of the Kali-side mpc-kali API.
+    /// Base URL of the Kali-side mcp-kali API.
     #[arg(long, env = "MCP_KALI_SERVER", default_value = "http://127.0.0.1:5000")]
     server: Url,
 
@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
         generate(
             shell,
             &mut Cli::command(),
-            "mpc-kali-bridge",
+            "mcp-kali-bridge",
             &mut std::io::stdout(),
         );
         return Ok(());

@@ -35,14 +35,14 @@ Use MCP Kali only on systems and targets you are explicitly authorized to test.
 ## Architecture
 
 ```text
-MCP host -> mpc-kali-bridge -> HTTP(S) -> mpc-kali -> Plugin Registry
+MCP host -> mcp-kali-bridge -> HTTP(S) -> mcp-kali -> Plugin Registry
                                                            -> durable queue
                                                            -> bounded workers
                                                            -> job files/API
 ```
 
-- `mpc-kali` runs on the Kali host and executes tools.
-- `mpc-kali-bridge` runs beside the MCP host and speaks newline-delimited MCP
+- `mcp-kali` runs on the Kali host and executes tools.
+- `mcp-kali-bridge` runs beside the MCP host and speaks newline-delimited MCP
   JSON-RPC over stdin/stdout. It never executes Kali tools locally.
 - Every submission returns a UUID job ID. Agents can do other work and inspect
   the job later rather than repeatedly blocking on a command.
@@ -75,15 +75,15 @@ cargo build --release
 The size-optimized binaries are:
 
 ```text
-target/release/mpc-kali
-target/release/mpc-kali-bridge
+target/release/mcp-kali
+target/release/mcp-kali-bridge
 ```
 
 `make install-local` creates a self-contained per-user runtime tree:
 
 ```text
 ~/.mcp-kali/
-├── bin/                         # mpc-kali and mpc-kali-bridge
+├── bin/                         # mcp-kali and mcp-kali-bridge
 ├── etc/
 │   ├── mcp-kali.conf            # normal, non-secret user configuration
 │   └── plugins/                 # administrator-overlay Plugins and catalog
@@ -127,7 +127,7 @@ functionality is removed.
 Start the server on loopback with a workspace-local state directory:
 
 ```bash
-./target/release/mpc-kali \
+./target/release/mcp-kali \
   --bind 127.0.0.1:5000 \
   --state-dir ./var/jobs \
   --system-data-dir ./share/mcp-kali \
@@ -145,7 +145,7 @@ Open `http://127.0.0.1:5000/` or `/monitor` for the dashboard. Start the MCP
 bridge beside the MCP host:
 
 ```bash
-./target/release/mpc-kali-bridge --server http://127.0.0.1:5000
+./target/release/mcp-kali-bridge --server http://127.0.0.1:5000
 ```
 
 For separate machines, keep the server on loopback and create an SSH tunnel:
@@ -252,7 +252,7 @@ Example configuration:
 {
   "mcpServers": {
     "mcp-kali": {
-      "command": "/absolute/path/to/mpc-kali-bridge",
+      "command": "/absolute/path/to/mcp-kali-bridge",
       "args": ["--server", "http://127.0.0.1:5000"]
     }
   }
@@ -272,6 +272,8 @@ prompt, authorization scope, tool policy, or behavior.
 The dashboard provides:
 
 - compact Active & queue and Finished history views;
+- a Tools view of registered Plugins and tools, declared command requirements,
+  and isolated unavailable-Plugin diagnostics;
 - queue order, state, tool, command summary, and elapsed time;
 - a left-edge `>` control that expands full metadata and wrapped command text;
 - pause, resume, remove, and force-kill controls where applicable;
@@ -306,8 +308,8 @@ They are written under `target/completions/`. Direct generation is also
 available through the hidden command:
 
 ```bash
-mpc-kali completions zsh > ~/.zfunc/_mpc-kali
-mpc-kali-bridge completions zsh > ~/.zfunc/_mpc-kali-bridge
+mcp-kali completions zsh > ~/.zfunc/_mcp-kali
+mcp-kali-bridge completions zsh > ~/.zfunc/_mcp-kali-bridge
 ```
 
 Supported shells are Bash, Zsh, Fish, PowerShell, and Elvish. For Zsh, ensure
@@ -387,8 +389,9 @@ development builds.
   available for isolated labs.
 - **A job stays queued:** verify `--max-concurrency`, inspect running/paused jobs,
   and check server stderr.
-- **A Plugin tool is absent:** inspect `/api/plugins/diagnostics`; an invalid
-  definition or missing declared command disables only that Plugin.
+- **A Plugin tool is absent:** open the Monitor Tools view (or inspect
+  `/api/plugins/diagnostics`); an invalid definition or missing declared
+  command disables only that Plugin.
 - **A job becomes interrupted after restart:** queued jobs resume, but formerly
   running processes cannot be adopted safely and are marked interrupted.
 - **Dashboard output looks like HTML:** this is expected; output is escaped and
