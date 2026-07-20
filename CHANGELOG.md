@@ -5,6 +5,13 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve Nmap's `-p` port argument in public command displays while still
+  redacting Hydra and Medusa password arguments.
+- Include the HTTP status, response content type, and body length in MCP bridge
+  invalid-JSON errors without exposing the response body.
+
 ## [2.1.1] - 2026-07-20
 
 ### Fixed

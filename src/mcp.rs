@@ -241,15 +241,31 @@ async fn api_request(
     }
     let response = builder.send().await.context("Kali API request failed")?;
     let status = response.status();
-    let value: Value = response
-        .json()
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("missing")
+        .to_owned();
+    let body = response
+        .bytes()
         .await
-        .context("Kali API returned invalid JSON")?;
+        .context("read Kali API response body")?;
+    let value = decode_api_json(status, &content_type, &body)?;
     tracing::debug!(%status, "Kali API response");
     if !status.is_success() {
         bail!("Kali API returned {status}: {}", bounded_api_error(&value));
     }
     Ok(value)
+}
+
+fn decode_api_json(status: reqwest::StatusCode, content_type: &str, body: &[u8]) -> Result<Value> {
+    serde_json::from_slice(body).with_context(|| {
+        format!(
+            "Kali API returned invalid JSON (HTTP {status}, content-type {content_type}, {} bytes)",
+            body.len()
+        )
+    })
 }
 
 fn tool_result(data: Value) -> Result<Value> {
@@ -327,6 +343,21 @@ mod tests {
             result.pointer("/structuredContent/security_classification"),
             Some(&json!("untrusted_job_execution_data"))
         );
+    }
+
+    #[test]
+    fn invalid_api_json_reports_safe_response_metadata() {
+        let error = decode_api_json(
+            reqwest::StatusCode::BAD_GATEWAY,
+            "text/html",
+            b"<html>gateway error</html>",
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("HTTP 502"));
+        assert!(error.contains("content-type text/html"));
+        assert!(error.contains("26 bytes"));
+        assert!(!error.contains("gateway error"));
     }
 
     #[test]

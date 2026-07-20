@@ -480,6 +480,10 @@ development builds.
   rendered as literal untrusted text.
 - **MCP host sees no tools:** run the client directly with `--version`/`--help`,
   confirm its absolute path, and verify server `/health` connectivity.
+- **Bridge reports invalid JSON:** its error now identifies the HTTP status,
+  content type, and response size without printing the body. Verify the exact
+  bridge `--server` URL with `curl -i`; for SSH tunnelling, prefer an unused
+  local port such as `5500` when another local process owns `5000`.
 
 ## Documentation
 

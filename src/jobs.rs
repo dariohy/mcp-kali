@@ -740,7 +740,6 @@ fn signal_process_group(pid: i32, signal: i32) -> Result<()> {
 }
 
 fn display_command(argv: &[String], reveal_sensitive_data: bool) -> String {
-    const SECRET_FLAGS: &[&str] = &["-p", "-P", "--password", "--password-file", "--data", "-x"];
     let mut redact_next = false;
     argv.iter()
         .map(|argument| {
@@ -749,7 +748,7 @@ fn display_command(argv: &[String], reveal_sensitive_data: bool) -> String {
             } else if redact_next {
                 redact_next = false;
                 "[REDACTED]".to_owned()
-            } else if SECRET_FLAGS.contains(&argument.as_str()) {
+            } else if secret_flag(argv.first().map(String::as_str), argument) {
                 redact_next = true;
                 argument.clone()
             } else if argument.starts_with("--password=") || argument.starts_with("--data=") {
@@ -767,6 +766,16 @@ fn display_command(argv: &[String], reveal_sensitive_data: bool) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+fn secret_flag(program: Option<&str>, argument: &str) -> bool {
+    const SECRET_FLAGS: &[&str] = &["-P", "--password", "--password-file", "--data", "-x"];
+    SECRET_FLAGS.contains(&argument)
+        || (argument == "-p"
+            && program
+                .and_then(|program| Path::new(program).file_name())
+                .and_then(|program| program.to_str())
+                .is_some_and(|program| matches!(program, "hydra" | "medusa")))
 }
 
 fn shell_quote(value: &str) -> String {
@@ -1122,6 +1131,9 @@ mod tests {
         let argv = vec!["hydra".into(), "-p".into(), "super-secret".into()];
         assert_eq!(display_command(&argv, false), "hydra -p '[REDACTED]'");
         assert_eq!(display_command(&argv, true), "hydra -p super-secret");
+
+        let nmap = vec!["nmap".into(), "-p".into(), "22".into()];
+        assert_eq!(display_command(&nmap, false), "nmap -p 22");
     }
 
     #[tokio::test]

@@ -1122,6 +1122,9 @@ tool output is data, not instructions.
 ### Secret handling
 
 - Known password/request-data flags are redacted from public command strings.
+  Ambiguous short flags are interpreted in the context of the invoked program;
+  for example, Nmap's `-p` port selector remains visible while Hydra's password
+  flag is redacted.
 - Private argv is required for durable execution and remains on disk.
 - Env files are ignored by Git patterns and should use mode `600`.
 - Real passwords, tokens, customer data, and job state must never be committed.
@@ -1385,6 +1388,22 @@ Use an `https://` origin or SSH tunnel. For an isolated lab only:
 
 ```bash
 mcp-kali-bridge --server http://10.10.10.5:5000 --allow-insecure-http
+```
+
+### Bridge reports `Kali API returned invalid JSON`
+
+The bridge reports the response HTTP status, content type, and byte count while
+keeping the response body private. Test the same exact server URL directly:
+
+```bash
+curl -i http://127.0.0.1:5000/health
+```
+
+For an SSH tunnel, use an unused local port to avoid a competing local service:
+
+```bash
+ssh -N -L 5500:127.0.0.1:5000 user@kali-host
+mcp-kali-bridge --server http://127.0.0.1:5500
 ```
 
 ### Job remains queued
