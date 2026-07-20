@@ -1,8 +1,8 @@
-# MCP Kali 2.1.0 User Manual
+# MCP Kali 2.1.1 User Manual
 
 This manual describes installation, configuration, MCP integration, job
 operation, HTTP APIs, security boundaries, maintenance, and troubleshooting for
-MCP Kali 2.1.0.
+MCP Kali 2.1.1.
 
 MCP Kali is a pentesting orchestration tool. Run it only against systems for
 which you have explicit authorization.
@@ -232,7 +232,7 @@ mcp-kali --version
 mcp-kali-bridge --version
 ```
 
-Both must report `2.1.0`.
+Both must report `2.1.1`.
 
 ## 5. Configuration
 
@@ -328,6 +328,12 @@ This applies only to declarative Plugin tools. `execute_command` remains raw
 explicit argv: use `program: "sudo"` and arguments beginning `-n`, `--`, and
 the desired command when the caller needs elevation.
 
+For a system service, test a declared root-required program without running it
+with `sudo -u <service-user> /usr/bin/sudo -n -l /usr/bin/nmap`. The Monitor
+uses the same per-program authorization check at startup, so one
+password-required sudoers entry does not incorrectly disable a command covered
+by a later `NOPASSWD` rule.
+
 ### Client variables and flags
 
 | Environment variable | CLI flag | Default | Validation |
@@ -379,13 +385,14 @@ user must have the installed tools and passwordless sudo for any root-required
 Plugin tools it is expected to run.
 
 ```bash
-sudo make install MCP_KALI_USER=kali MCP_KALI_GROUP=kali
+sudo make install
 sudo make systemd-reload enable-system
 ```
 
 `make install` detects its effective UID: as a regular user it runs the local
-installer; as root it performs the system install and requires
-`MCP_KALI_USER` to identify an existing authorized service account.
+installer; as root it performs the system install using the existing `kali`
+account by default. Override it for another existing account, for example
+`sudo make install MCP_KALI_USER=hutt MCP_KALI_GROUP=hutt`.
 `install-local` and `install-system` remain available for explicit automation.
 
 The root-only installer places binaries in `/usr/local/bin`, Plugin manifests
@@ -400,9 +407,9 @@ The unit uses `Type=exec`, restart-on-failure, journald logging, `SIGTERM` for
 normal stop, and `ExecReload` to send `SIGHUP`. Its hardening intentionally does
 not enable `NoNewPrivileges`, `PrivateUsers`, or a restrictive capability set,
 because those would break the selected user's passwordless sudo path.
-`WorkingDirectory=~` resolves to the selected `User=` account's home directory;
-outside systemd, mcp-kali leaves the invoking process's working directory
-unchanged.
+The installer renders an explicit `WorkingDirectory` from the selected `User=`
+account's home directory; outside systemd, mcp-kali leaves the invoking
+process's working directory unchanged.
 
 Without an explicit `--config-file` or `MCP_KALI_CONFIG_FILE`, the binaries use
 `/etc/mcp-kali/mcp-kali.conf` when it exists; otherwise they retain the normal
@@ -491,6 +498,11 @@ That override is intended only for isolated labs.
 
 If settings live in `~/.mcp-kali/etc/mcp-kali.conf`, the `args` array can be
 empty.
+
+The MCP host launches the bridge locally, so `command` must be an absolute path
+on that host; `~/.local/bin/mcp-kali-bridge` is not expanded by MCP launchers.
+On macOS, run `make client-install` locally and configure a path such as
+`/Users/you/.local/bin/mcp-kali-bridge`.
 
 ### Protocol behavior
 
@@ -779,7 +791,7 @@ written up to the time of the request. A later download may therefore be longer.
 
 ## 10. HTTP API reference
 
-The API has no version prefix in 2.1.0. Bind it only to a protected interface.
+The API has no version prefix in 2.1.1. Bind it only to a protected interface.
 
 ### Health
 
@@ -791,7 +803,7 @@ Example response:
 {
   "status": "healthy",
   "service": "mcp-kali",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "queued": 0,
   "running": 1,
   "max_concurrency": 2
@@ -1122,7 +1134,7 @@ sensitive even when reveal mode is off.
 
 ### Network controls
 
-Version 2.1.0 has no built-in user authentication, authorization, or TLS server.
+Version 2.1.1 has no built-in user authentication, authorization, or TLS server.
 Default controls are:
 
 - loopback server bind;
@@ -1311,7 +1323,7 @@ MCP `serverInfo.version` plus `/health.version` use `CARGO_PKG_VERSION`.
 
 ### Pre-1.0 development snapshots
 
-Version 1.0.0 introduced several boundaries that remain in 2.1.0 and may require integration
+Version 1.0.0 introduced several boundaries that remain in 2.1.1 and may require integration
 updates:
 
 - binaries are split into client and server;

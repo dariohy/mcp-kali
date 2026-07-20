@@ -5,7 +5,25 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ## [Unreleased]
 
-## [2.1.0] - 2026-07-19
+## [2.1.1] - 2026-07-20
+
+### Fixed
+
+- Check non-interactive sudo authorization for each root-required declarative
+  program without executing it, instead of using the overly strict `sudo -v`
+  credential-validation probe.
+- Render a concrete systemd service-user home directory, stop injecting the
+  application configuration through `EnvironmentFile`, and retain access to
+  the service user's writable working directory.
+- Default system installs to the existing Kali `kali` account while preserving
+  explicit service-user and group overrides.
+
+### Changed
+
+- Replaces the withdrawn 2.1.0 release, which contained systemd installation
+  and sudo-readiness defects. Use 2.1.1 or later.
+
+## 2.1.0 - 2026-07-19 (withdrawn)
 
 ### Added
 
@@ -165,8 +183,8 @@ All notable changes to MCP Kali are documented here. The project follows
 - There is no automatic job-retention policy; operators must manage the private
   state directory according to their evidence-retention requirements.
 
-[Unreleased]: https://github.com/dariohy/mcp-kali/compare/v2.1.0...HEAD
-[2.1.0]: https://github.com/dariohy/mcp-kali/releases/tag/v2.1.0
+[Unreleased]: https://github.com/dariohy/mcp-kali/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/dariohy/mcp-kali/releases/tag/v2.1.1
 [2.0.0]: https://github.com/dariohy/mcp-kali/releases/tag/v2.0.0
 [1.1.0]: https://github.com/dariohy/mcp-kali/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dariohy/mcp-kali/releases/tag/v1.0.0

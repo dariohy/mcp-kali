@@ -1,4 +1,4 @@
-# MCP Kali 2.1.0
+# MCP Kali 2.1.1
 
 [![CI](https://github.com/dariohy/mcp-kali/actions/workflows/ci.yml/badge.svg)](https://github.com/dariohy/mcp-kali/actions/workflows/ci.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
@@ -11,7 +11,8 @@ to an MCP host and returns job IDs immediately.
 
 Use MCP Kali only on systems and targets you are explicitly authorized to test.
 
-**Project status:** `v2.1.0` is the current stable release.
+**Project status:** `v2.1.1` is the current stable release. Version 2.1.0 was
+withdrawn because of system-installation and sudo-readiness defects.
 
 ## Contents
 
@@ -138,13 +139,14 @@ user that has the required tools and, when root-required Plugin tools are used,
 noninteractive sudo permission.
 
 ```bash
-sudo make install MCP_KALI_USER=kali MCP_KALI_GROUP=kali
+sudo make install
 sudo make systemd-reload enable-system
 ```
 
 When run as a regular user, `make install` creates the per-user tree. When run
-as root, it performs the system install and requires `MCP_KALI_USER` to name an
-existing authorized service account. `install-local` and `install-system`
+as root, it performs the system install as the `kali` user by default. Select a
+different existing account when needed, for example `sudo make install
+MCP_KALI_USER=hutt MCP_KALI_GROUP=hutt`. `install-local` and `install-system`
 remain available when automation needs to force a mode.
 
 The system install places binaries under `/usr/local/bin`, Plugin manifests and the
@@ -315,6 +317,11 @@ Example configuration:
   }
 }
 ```
+
+`command` must be an absolute executable path; MCP hosts do not expand `~`.
+For example, on macOS use `/Users/you/.local/bin/mcp-kali-bridge`, after running
+`make client-install` on that Mac. The bridge runs beside the MCP host, not on
+the Kali server, and connects to the server URL supplied in `args`.
 
 The client retrieves the current Plugin tool projection from the server for
 each MCP `tools/list` request and forwards calls to the generic invocation API.

@@ -47,7 +47,7 @@ struct PrivilegeRuntime {
     elevation: PrivilegeElevation,
     is_root: bool,
     sudo: Option<PathBuf>,
-    sudo_ready: bool,
+    sudo_authorizations: BTreeMap<String, bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -294,24 +294,9 @@ impl PluginRegistry {
                 elevation: privilege_elevation,
                 is_root: running_as_root(),
                 sudo: resolve_command("sudo"),
-                sudo_ready: false,
+                sudo_authorizations: BTreeMap::new(),
             },
         };
-        registry.privilege.sudo_ready = registry.privilege.is_root
-            || (registry.privilege.elevation == PrivilegeElevation::Auto
-                && registry
-                    .privilege
-                    .sudo
-                    .as_deref()
-                    .is_some_and(noninteractive_sudo_is_ready));
-        if registry.privilege.elevation == PrivilegeElevation::Auto
-            && !registry.privilege.is_root
-            && !registry.privilege.sudo_ready
-        {
-            tracing::warn!(
-                "privilege elevation is auto but non-interactive sudo is unavailable; root-requiring tools are disabled"
-            );
-        }
         registry.register_core(execute_enabled);
         registry.register_jobs();
 
@@ -331,6 +316,7 @@ impl PluginRegistry {
             );
         }
         registry.resolve_capabilities(catalog);
+        registry.refresh_sudo_authorizations();
         registry
     }
 
@@ -346,7 +332,7 @@ impl PluginRegistry {
                         if self.tool_is_enabled(tool) {
                             " Requires root privileges; the default auto mode uses non-interactive sudo unless the server already runs as root."
                         } else {
-                            " Requires root privileges, but non-interactive sudo was unavailable at server startup, so this tool is disabled in auto elevation mode."
+                            " Requires root privileges, but the server user is not authorized for this command through non-interactive sudo, so this tool is disabled in auto elevation mode."
                         }
                     } else {
                         ""
@@ -519,9 +505,9 @@ impl PluginRegistry {
         {
             return Ok(argv);
         }
-        if !self.privilege.sudo_ready {
+        if !self.tool_sudo_ready(tool) {
             bail!(
-                "tool requires root privileges, but non-interactive sudo is unavailable; configure passwordless sudo for the server user, run mcp-kali as root, or set MCP_KALI_PRIVILEGE_ELEVATION=none"
+                "tool requires root privileges, but the server user is not authorized for this command through non-interactive sudo; configure passwordless sudo for the server user, run mcp-kali as root, or set MCP_KALI_PRIVILEGE_ELEVATION=none"
             );
         }
         let sudo = self
@@ -537,7 +523,19 @@ impl PluginRegistry {
     fn tool_is_enabled(&self, tool: &RegisteredTool) -> bool {
         tool.privilege.as_deref() != Some("root")
             || self.privilege.elevation == PrivilegeElevation::None
-            || self.privilege.sudo_ready
+            || self.privilege.is_root
+            || self.tool_sudo_ready(tool)
+    }
+
+    fn tool_sudo_ready(&self, tool: &RegisteredTool) -> bool {
+        let ToolHandler::Declarative(execution) = &tool.handler else {
+            return false;
+        };
+        self.privilege
+            .sudo_authorizations
+            .get(&execution.program)
+            .copied()
+            .unwrap_or(false)
     }
 
     fn tool_elevation_metadata(&self, tool: &RegisteredTool) -> Value {
@@ -553,17 +551,58 @@ impl PluginRegistry {
                 "message":"Automatic elevation is disabled; this tool runs as the server user."
             });
         }
-        if self.privilege.sudo_ready {
+        if self.tool_sudo_ready(tool) {
             return json!({
                 "status":"available",
                 "method":"sudo_noninteractive",
-                "message":"Non-interactive sudo was verified at server startup; command-specific sudoers rules still apply."
+                "message":"Non-interactive sudo authorization for this command was verified at server startup."
             });
         }
         json!({
             "status":"unavailable",
-            "message":"Non-interactive sudo was unavailable at server startup; this tool cannot run in auto elevation mode."
+            "message":"The server user was not authorized for this command through non-interactive sudo at startup; this tool cannot run in auto elevation mode."
         })
+    }
+
+    fn refresh_sudo_authorizations(&mut self) {
+        self.privilege.sudo_authorizations.clear();
+        if self.privilege.elevation != PrivilegeElevation::Auto || self.privilege.is_root {
+            return;
+        }
+        let Some(sudo) = self.privilege.sudo.as_deref() else {
+            tracing::warn!(
+                "privilege elevation is auto but sudo is unavailable; root-requiring tools are disabled"
+            );
+            return;
+        };
+        let programs = self
+            .tools
+            .values()
+            .filter(|tool| tool.privilege.as_deref() == Some("root"))
+            .filter_map(|tool| match &tool.handler {
+                ToolHandler::Declarative(execution) => Some(execution.program.clone()),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>();
+        for program in programs {
+            let authorized = resolve_command(&program)
+                .is_some_and(|path| noninteractive_sudo_authorizes(sudo, &path));
+            self.privilege
+                .sudo_authorizations
+                .insert(program, authorized);
+        }
+        let unavailable = self
+            .privilege
+            .sudo_authorizations
+            .iter()
+            .filter_map(|(program, authorized)| (!authorized).then_some(program.as_str()))
+            .collect::<Vec<_>>();
+        if !unavailable.is_empty() {
+            tracing::warn!(
+                ?unavailable,
+                "non-interactive sudo authorization unavailable for root-requiring tools"
+            );
+        }
     }
 
     fn register_core(&mut self, execute_enabled: bool) {
@@ -1298,9 +1337,10 @@ fn running_as_root() -> bool {
     }
 }
 
-fn noninteractive_sudo_is_ready(sudo: &Path) -> bool {
+fn noninteractive_sudo_authorizes(sudo: &Path, program: &Path) -> bool {
     std::process::Command::new(sudo)
-        .args(["-n", "-v"])
+        .args(["-n", "-l"])
+        .arg(program)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -1530,7 +1570,7 @@ tools:
                 elevation: PrivilegeElevation::Auto,
                 is_root: false,
                 sudo: Some(PathBuf::from("/usr/bin/sudo")),
-                sudo_ready: true,
+                sudo_authorizations: BTreeMap::from([("nmap".into(), true)]),
             },
         };
         let execution = ExecutionDefinition {
@@ -1548,6 +1588,16 @@ tools:
             tags: Vec::new(),
             handler: ToolHandler::Declarative(execution.clone()),
         };
+        assert!(registry.tool_is_enabled(&root_tool));
+        let unauthorized_tool = RegisteredTool {
+            handler: ToolHandler::Declarative(ExecutionDefinition {
+                program: "nikto".into(),
+                args: Vec::new(),
+                timeout_seconds: None,
+            }),
+            ..root_tool.clone()
+        };
+        assert!(!registry.tool_is_enabled(&unauthorized_tool));
         assert_eq!(
             registry
                 .prepare_declarative_argv(&root_tool, &execution, &json!({}))
@@ -1578,7 +1628,7 @@ tools:
                 elevation: PrivilegeElevation::None,
                 is_root: false,
                 sudo: None,
-                sudo_ready: false,
+                sudo_authorizations: BTreeMap::new(),
             },
         };
         let execution = ExecutionDefinition {
@@ -1615,7 +1665,7 @@ tools:
                 elevation: PrivilegeElevation::Auto,
                 is_root: false,
                 sudo: None,
-                sudo_ready: false,
+                sudo_authorizations: BTreeMap::new(),
             },
         };
         let execution = ExecutionDefinition {
@@ -1638,7 +1688,7 @@ tools:
                 .prepare_declarative_argv(&tool, &execution, &json!({}))
                 .unwrap_err()
                 .to_string()
-                .contains("non-interactive sudo is unavailable")
+                .contains("not authorized for this command")
         );
         assert!(!registry.tool_is_enabled(&tool));
         assert_eq!(
