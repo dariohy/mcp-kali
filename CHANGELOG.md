@@ -14,6 +14,9 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ### Changed
 
+- Apply the dashboard accents `#3CB335` and `#006DC7`, organize Tools into
+  searchable Plugin-filtered collapsible groups, and replace dense Reference
+  cards with a searchable filtered index and dedicated reading pane.
 - Namespace bridge-only configuration as `MCP_KALI_BRIDGE_SERVER` and
   `MCP_KALI_BRIDGE_ALLOW_INSECURE_HTTP`; the previous names remain migration
   aliases when the new names are unset.

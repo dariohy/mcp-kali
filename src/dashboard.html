@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>MCP Kali Job Control</title>
   <style>
-    :root { color-scheme: dark; font: 14px/1.45 system-ui, sans-serif; background: #0b1014; color: #dce7ec; }
+    :root { color-scheme: dark; font: 14px/1.45 system-ui, sans-serif; background: #0b1014; color: #dce7ec; --accent-green:#3CB335; --accent-blue:#006DC7; }
     body { max-width: 1380px; margin: 32px auto; padding: 0 22px; }
-    h1 { margin: 0; color: #74e6aa; font-size: 26px; } .muted { color: #9aabb6; }
+    h1 { margin: 0; color: var(--accent-green); font-size: 26px; } .muted { color: #9aabb6; }
     header, .tabs, .job-actions, .details-head, .stats { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     header { justify-content: space-between; margin-bottom: 18px; } .stats { justify-content: flex-end; }
     .stat { border: 1px solid #2d3b45; border-radius: 7px; padding: 5px 10px; background:#121c23; }
@@ -15,7 +15,7 @@
     button:hover { background: #20543c; } button.danger { border-color: #803b42; background: #4f2027; color: #ffd6d6; }
     button.danger:hover { background:#6b2730; } button.secondary { border-color:#405564; background:#18262e; color:#dce7ec; }
     button.tab { border-color: transparent; background: transparent; color:#9aabb6; border-radius:0; padding:10px 14px; }
-    button.tab.active { color:#74e6aa; border-bottom:2px solid #74e6aa; }
+    button.tab.active { color:var(--accent-green); border-bottom:2px solid var(--accent-green); }
     .panel { display: none; } .panel.active { display:block; }
     .summary { margin: 15px 0; color:#9aabb6; }
     .job { border: 1px solid #293942; border-radius: 8px; background: #10191f; margin: 7px 0; overflow:hidden; }
@@ -23,7 +23,7 @@
     .row:hover { background:#142129; } .queue { color:#c6d6df; } .tool { font-weight:650; }
     code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; }
     .state { font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.04em; }
-    .running { color:#ffd166; }.paused { color:#b6a7ff; }.queued { color:#7db9ff; }.succeeded { color:#74e6aa; }
+    .running { color:#ffd166; }.paused { color:#b6a7ff; }.queued { color:var(--accent-blue); }.succeeded { color:var(--accent-green); }
     .failed,.timed_out,.interrupted,.cancelled { color:#ff9292; }
     .job-actions { gap:6px; flex-wrap:nowrap; } .job-actions button, .expand { font-size:12px; padding:4px 7px; }
     .expand { min-width:27px; padding:3px 6px; font-size:15px; line-height:1; white-space:nowrap; }
@@ -32,19 +32,33 @@
     .metadata { background:#0c1419; border:1px solid #293942; border-radius:6px; padding:10px; word-break:break-word; }
     .metadata div { margin:5px 0; } pre { margin:0; background:#090f13; border:1px solid #293942; padding:10px; border-radius:6px; overflow:auto; max-height:330px; white-space:pre-wrap; color:#c8d9e2; }
     code.full-command { margin-top:5px; white-space:pre-wrap; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; max-height:160px; }
-    .output-title { margin:0 0 5px; color:#9aabb6; font-size:12px; } .output-title a { color:#9fd5ff; text-decoration:none; margin-left:8px; } .output-title a:hover { text-decoration:underline; } .output-warning { margin:0 0 8px; color:#ffd166; font-size:12px; } .empty { padding:32px; text-align:center; color:#9aabb6; }
+    .output-title { margin:0 0 5px; color:#9aabb6; font-size:12px; } .output-title a { color:var(--accent-blue); text-decoration:none; margin-left:8px; } .output-title a:hover { text-decoration:underline; } .output-warning { margin:0 0 8px; color:#ffd166; font-size:12px; } .empty { padding:32px; text-align:center; color:#9aabb6; }
     #notice { min-height:20px; color:#ffb4b4; } .refresh { color:#9aabb6; font-size:12px; }
-    a.runtime-link { color:#9fd5ff; text-decoration:none; } a.runtime-link:hover { text-decoration:underline; }
+    a.runtime-link { color:var(--accent-blue); text-decoration:none; } a.runtime-link:hover { text-decoration:underline; }
     .runtime-summary { margin:15px 0; color:#9aabb6; } .runtime-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:10px; }
     .runtime-card { border:1px solid #293942; border-radius:8px; background:#10191f; padding:12px; } .runtime-card h2 { margin:0; font-size:16px; }
     .runtime-card p { margin:7px 0; } .runtime-card code { display:inline; white-space:normal; overflow-wrap:anywhere; }
-    .runtime-status { font-weight:700; font-size:11px; letter-spacing:.04em; text-transform:uppercase; } .available { color:#74e6aa; } .unavailable { color:#ff9292; } .root-required { color:#ffd166; } .disabled { color:#ff9292; }
-    .tool-list { margin:8px 0 0; padding-left:18px; } .tool-list li { margin:5px 0; } .tool-description { color:#9aabb6; }
+    .runtime-status { font-weight:700; font-size:11px; letter-spacing:.04em; text-transform:uppercase; } .available { color:var(--accent-green); } .unavailable { color:#ff9292; } .root-required { color:#ffd166; } .disabled { color:#ff9292; }
+    .catalog-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; padding:10px; border:1px solid #293942; border-radius:8px; background:#0f181e; }
+    .catalog-toolbar input, .catalog-toolbar select { min-width:190px; border:1px solid #405564; border-radius:6px; background:#0b1217; color:#dce7ec; padding:7px 9px; }
+    .catalog-toolbar input { flex:1; min-width:240px; } .catalog-count { margin-left:auto; color:#9aabb6; font-size:12px; }
+    .catalog-list { display:grid; gap:8px; } [hidden] { display:none !important; }
+    details.plugin-card { padding:0; overflow:hidden; } details.plugin-card summary { display:flex; align-items:center; gap:8px; cursor:pointer; padding:11px 12px; list-style:none; }
+    details.plugin-card summary::-webkit-details-marker { display:none; } details.plugin-card summary::before { content:'›'; color:var(--accent-blue); font-size:19px; line-height:1; transition:transform .12s ease; }
+    details.plugin-card[open] summary::before { transform:rotate(90deg); } .plugin-title { font-weight:700; font-size:15px; } .plugin-count { margin-left:auto; color:#9aabb6; white-space:nowrap; }
+    .plugin-body { border-top:1px solid #293942; padding:10px 12px 12px; } .plugin-meta { color:#9aabb6; margin:0 0 8px; }
+    .tool-list { list-style:none; margin:8px 0 0; padding:0; border:1px solid #293942; border-radius:6px; overflow:hidden; }
+    .tool-list li { display:grid; grid-template-columns:minmax(180px,.8fr) minmax(260px,2fr); gap:10px; padding:8px 10px; border-top:1px solid #293942; } .tool-list li:first-child { border-top:0; }
+    .tool-list li:hover { background:#142129; } .tool-description { color:#9aabb6; }
     .diagnostics { margin-top:18px; } .diagnostic-card { border-color:#653b42; background:#24171c; } .diagnostic-card h2 { color:#ffb4b4; }
-    .reference-layout { display:grid; grid-template-columns:minmax(280px,.8fr) minmax(360px,2fr); gap:12px; }
-    .reference-card { cursor:pointer; } .reference-card.selected { border-color:#4c9a70; background:#14251d; }
-    .reference-document { min-height:240px; } .reference-document pre { max-height:70vh; }
-    @media (max-width: 850px) { .row { grid-template-columns: 34px 82px minmax(80px,1fr) auto; } .command,.elapsed { display:none; } .detail,.reference-layout { grid-template-columns:1fr; } }
+    .diagnostics summary { cursor:pointer; color:#c8d9e2; } .diagnostics > summary h2 { display:inline; font-size:16px; }
+    .reference-layout { display:grid; grid-template-columns:minmax(280px,.75fr) minmax(420px,2fr); gap:12px; align-items:start; }
+    .reference-index { display:grid; gap:5px; max-height:72vh; overflow:auto; padding-right:4px; }
+    button.reference-item { width:100%; text-align:left; border-color:#293942; background:#10191f; color:#dce7ec; padding:9px 10px; }
+    button.reference-item:hover { background:#142129; } button.reference-item.selected { border-color:var(--accent-green); background:#14251d; }
+    .reference-title { display:block; font-weight:700; } .reference-meta { display:block; margin-top:3px; color:#9aabb6; font-size:12px; overflow-wrap:anywhere; }
+    .reference-document { min-height:240px; position:sticky; top:12px; } .reference-document pre { max-height:70vh; }
+    @media (max-width: 850px) { .row { grid-template-columns: 34px 82px minmax(80px,1fr) auto; } .command,.elapsed { display:none; } .detail,.reference-layout { grid-template-columns:1fr; } .reference-document { position:static; } .reference-index { max-height:42vh; } .tool-list li { grid-template-columns:1fr; } .catalog-count { width:100%; margin-left:0; } }
   </style>
 </head>
 <body>
@@ -68,7 +82,7 @@
   <section class="panel" id="references"></section>
 <script>
   const activeStates = new Set(['queued','running','paused']);
-  let jobs = [], runtime = {plugins:0,tools:0,references:0,diagnostics:0}, plugins = [], toolDefinitions = [], diagnostics = [], references = [], referenceDiagnostics = [], selectedReference = null, selectedReferenceId = null, currentTab = 'active', autoRefreshEnabled = false, autoRefreshTimer = null, lastUpdated = null, loading = false, listSignature = null;
+  let jobs = [], runtime = {plugins:0,tools:0,references:0,diagnostics:0}, plugins = [], toolDefinitions = [], diagnostics = [], references = [], referenceDiagnostics = [], selectedReference = null, selectedReferenceId = null, toolQuery = '', toolPluginFilter = 'all', referenceQuery = '', referencePluginFilter = 'all', currentTab = 'active', autoRefreshEnabled = false, autoRefreshTimer = null, lastUpdated = null, loading = false, listSignature = null;
   const expandedJobs = new Set();
   const activePanel = document.getElementById('active');
   const historyPanel = document.getElementById('history');
@@ -125,19 +139,63 @@
       if (!byPlugin.has(pluginId)) byPlugin.set(pluginId, []);
       byPlugin.get(pluginId).push(tool);
     }
-    const available = plugins.map(plugin => {
+    const pluginOptions = [...plugins].sort((a,b) => a.name.localeCompare(b.name)).map(plugin => `<option value="${esc(plugin.id)}"${toolPluginFilter === plugin.id ? ' selected' : ''}>${esc(plugin.name)}</option>`).join('');
+    const available = [...plugins].sort((a,b) => a.name.localeCompare(b.name)).map(plugin => {
       const tools = byPlugin.get(plugin.id) || [];
       const requirements = plugin.requirements?.commands || [];
-      return `<article class="runtime-card"><div><span class="runtime-status available">Available</span> <h2>${esc(plugin.name)} <span class="muted">${esc(plugin.version)}</span></h2></div><p><code>${esc(plugin.id)}</code> · ${esc(plugin.source)}</p><p>${esc(plugin.description || 'No description.')}</p><p><b>Required commands:</b> ${values(requirements)}</p><p><b>Registered tools (${tools.length}):</b></p><ul class="tool-list">${tools.map(tool => `<li><code>${esc(tool.name)}</code>${elevationBadge(tool)} <span class="tool-description">${esc(tool.description)}</span></li>`).join('') || '<li class="muted">No tools registered.</li>'}</ul></article>`;
-    }).join('') || '<div class="empty">No Plugins are registered.</div>';
+      const pluginSearch = `${plugin.id} ${plugin.name} ${plugin.description || ''} ${plugin.source || ''}`.toLowerCase();
+      return `<details class="runtime-card plugin-card" data-plugin="${esc(plugin.id)}" data-search="${esc(pluginSearch)}"><summary><span class="runtime-status available">Available</span><span class="plugin-title">${esc(plugin.name)} <span class="muted">${esc(plugin.version)}</span></span><span class="plugin-count">${tools.length} tool${tools.length === 1 ? '' : 's'}</span></summary><div class="plugin-body"><p class="plugin-meta"><code>${esc(plugin.id)}</code> · ${esc(plugin.source)}</p><p>${esc(plugin.description || 'No description.')}</p><p><b>Required commands:</b> ${values(requirements)}</p><ul class="tool-list">${tools.map(tool => `<li data-search="${esc(`${tool.name} ${tool.description || ''}`.toLowerCase())}"><span><code>${esc(tool.name)}</code>${elevationBadge(tool)}</span><span class="tool-description">${esc(tool.description)}</span></li>`).join('') || '<li class="muted">No tools registered.</li>'}</ul></div></details>`;
+    }).join('');
     const unavailable = diagnostics.map(diagnostic => `<article class="runtime-card diagnostic-card"><span class="runtime-status unavailable">Unavailable</span><h2>${esc(diagnostic.plugin_id || diagnostic.tool_name || 'Plugin definition')}</h2><p><b>Layer:</b> ${esc(diagnostic.layer)} · <code>${esc(diagnostic.path)}</code></p><p>${esc(diagnostic.message)}</p></article>`).join('') || '<div class="empty">No Plugin diagnostics. All discovered definitions are available.</div>';
-    toolsPanel.innerHTML = `<p class="runtime-summary">Tools are discovered at server startup. If a Plugin requires an executable that is absent from the server PATH, that Plugin is not published to MCP; the server and other Plugins continue running. In auto elevation mode, mcp-kali checks non-interactive sudo at startup and marks root-required tools disabled when it is unavailable.</p><div class="runtime-grid">${available}</div><div class="diagnostics"><h2>Unavailable definitions and diagnostics (${diagnostics.length})</h2><div class="runtime-grid">${unavailable}</div></div>`;
+    toolsPanel.innerHTML = `<p class="runtime-summary">Tools are grouped by Plugin. Search by tool, Plugin, or description, then expand only the groups you need.</p><div class="catalog-toolbar"><input id="tool-search" type="search" value="${esc(toolQuery)}" placeholder="Search tools and Plugins…" aria-label="Search tools and Plugins" oninput="toolQuery=this.value; filterToolCatalog()"><select id="tool-plugin-filter" aria-label="Filter tools by Plugin" onchange="toolPluginFilter=this.value; filterToolCatalog()"><option value="all">All Plugins</option>${pluginOptions}</select><span class="catalog-count" id="tool-count"></span></div><div class="catalog-list" id="tool-catalog">${available}</div><div class="empty" id="tool-empty" hidden>${plugins.length ? 'No tools match this filter.' : 'No Plugins are registered.'}</div><details class="diagnostics"><summary><h2>Unavailable definitions and diagnostics (${diagnostics.length})</h2></summary><div class="runtime-grid">${unavailable}</div></details>`;
+    filterToolCatalog();
+  }
+  function filterToolCatalog() {
+    const query = toolQuery.trim().toLowerCase();
+    let visiblePlugins = 0, visibleTools = 0;
+    document.querySelectorAll('#tool-catalog .plugin-card').forEach(card => {
+      const pluginAllowed = toolPluginFilter === 'all' || card.dataset.plugin === toolPluginFilter;
+      const pluginMatches = !query || card.dataset.search.includes(query);
+      let matchingTools = 0;
+      card.querySelectorAll('.tool-list li[data-search]').forEach(item => {
+        const matches = !query || pluginMatches || item.dataset.search.includes(query);
+        item.hidden = !matches;
+        if (matches) matchingTools++;
+      });
+      const visible = pluginAllowed && (pluginMatches || matchingTools > 0);
+      card.hidden = !visible;
+      if (visible) { visiblePlugins++; visibleTools += matchingTools; }
+      if (query && visible) card.open = true;
+    });
+    const count = document.getElementById('tool-count');
+    const empty = document.getElementById('tool-empty');
+    if (count) count.textContent = `${visiblePlugins} Plugin${visiblePlugins === 1 ? '' : 's'} · ${visibleTools} tool${visibleTools === 1 ? '' : 's'}`;
+    if (empty) empty.hidden = visiblePlugins !== 0;
   }
   function renderReferences() {
-    const cards = references.map(reference => `<article class="runtime-card reference-card${selectedReferenceId === reference.id ? ' selected' : ''}" onclick="openReference('${reference.id}')"><h2>${esc(reference.title)}</h2><p><code>${esc(reference.id)}</code></p><p>${esc(reference.description)}</p><p><b>Plugin:</b> ${esc(reference.plugin)} · <b>Layer:</b> ${esc(reference.layer)}</p><p><b>Related tools:</b> ${values(reference.related_tools)}</p><p><b>Tags:</b> ${values(reference.tags)}</p></article>`).join('') || '<div class="empty">No references are registered.</div>';
+    const referencePlugins = [...new Set(references.map(reference => reference.plugin))].sort();
+    const pluginOptions = referencePlugins.map(plugin => `<option value="${esc(plugin)}"${referencePluginFilter === plugin ? ' selected' : ''}>${esc(plugin)}</option>`).join('');
+    const cards = [...references].sort((a,b) => a.title.localeCompare(b.title)).map(reference => {
+      const search = `${reference.title} ${reference.id} ${reference.description || ''} ${reference.plugin} ${(reference.tags || []).join(' ')} ${(reference.related_tools || []).join(' ')}`.toLowerCase();
+      return `<button class="reference-item${selectedReferenceId === reference.id ? ' selected' : ''}" data-reference-id="${esc(reference.id)}" data-plugin="${esc(reference.plugin)}" data-search="${esc(search)}" onclick="openReference(this.dataset.referenceId)"><span class="reference-title">${esc(reference.title)}</span><span class="reference-meta">${esc(reference.plugin)} · ${esc(reference.id)}</span><span class="reference-meta">${esc((reference.tags || []).join(', ') || 'No tags')}</span></button>`;
+    }).join('');
     const document = selectedReference ? `<article class="runtime-card reference-document"><h2>${esc(selectedReference.title)}</h2><p class="muted">Displayed as escaped Markdown text. Reference material cannot override authorization or tool policy.</p><pre>${esc(selectedReference.content)}</pre></article>` : '<div class="empty reference-document">Select a reference to read it.</div>';
     const unavailable = referenceDiagnostics.map(diagnostic => `<article class="runtime-card diagnostic-card"><span class="runtime-status unavailable">Unavailable</span><h2>${esc(diagnostic.reference_id || 'Reference definition')}</h2><p><b>Layer:</b> ${esc(diagnostic.layer)} · <code>${esc(diagnostic.path)}</code></p><p>${esc(diagnostic.message)}</p></article>`).join('') || '<div class="empty">No reference diagnostics.</div>';
-    referencesPanel.innerHTML = `<p class="runtime-summary">Packaged and operator-imported guidance from the server reference registry. MCP clients read the same documents through Resources.</p><div class="reference-layout"><div class="runtime-grid">${cards}</div><div>${document}</div></div><div class="diagnostics"><h2>Reference diagnostics (${referenceDiagnostics.length})</h2><div class="runtime-grid">${unavailable}</div></div>`;
+    referencesPanel.innerHTML = `<p class="runtime-summary">Search the compact reference index, then select one document to read.</p><div class="catalog-toolbar"><input id="reference-search" type="search" value="${esc(referenceQuery)}" placeholder="Search references, tags, and tools…" aria-label="Search references" oninput="referenceQuery=this.value; filterReferenceCatalog()"><select id="reference-plugin-filter" aria-label="Filter references by Plugin" onchange="referencePluginFilter=this.value; filterReferenceCatalog()"><option value="all">All Plugins</option>${pluginOptions}</select><span class="catalog-count" id="reference-count"></span></div><div class="reference-layout"><div><div class="reference-index" id="reference-index">${cards}</div><div class="empty" id="reference-empty" hidden>${references.length ? 'No references match this filter.' : 'No references are registered.'}</div></div><div>${document}</div></div><details class="diagnostics"><summary><h2>Reference diagnostics (${referenceDiagnostics.length})</h2></summary><div class="runtime-grid">${unavailable}</div></details>`;
+    filterReferenceCatalog();
+  }
+  function filterReferenceCatalog() {
+    const query = referenceQuery.trim().toLowerCase();
+    let visible = 0;
+    document.querySelectorAll('#reference-index .reference-item').forEach(item => {
+      const matches = (referencePluginFilter === 'all' || item.dataset.plugin === referencePluginFilter) && (!query || item.dataset.search.includes(query));
+      item.hidden = !matches;
+      if (matches) visible++;
+    });
+    const count = document.getElementById('reference-count');
+    const empty = document.getElementById('reference-empty');
+    if (count) count.textContent = `${visible} reference${visible === 1 ? '' : 's'}`;
+    if (empty) empty.hidden = visible !== 0;
   }
   async function openReference(id) {
     try {

@@ -903,12 +903,15 @@ jobs.
 - **Active & queue:** running and paused jobs first, followed by queued jobs in
   dispatch order.
 - **Finished history:** newest terminal jobs first.
-- **Tools:** registered Plugins and tools, their declared command requirements,
-  root requirements, and startup diagnostics. A missing required executable prevents only that
-  Plugin from being published through MCP; the server and other Plugins
-  continue running.
+- **Tools:** search by tool, Plugin, or description; filter by Plugin; and expand
+  only the Plugin groups needed. Each group shows its registered tools,
+  declared command requirements, root requirements, and startup diagnostics. A
+  missing required executable prevents only that Plugin from being published
+  through MCP; the server and other Plugins continue running.
 - **References:** packaged and operator-imported guidance from the same registry
-  exposed through MCP Resources. Markdown is HTML-escaped and displayed as
+  exposed through MCP Resources. Search the compact index by title, ID,
+  description, tag, or related tool, filter it by Plugin, and select one item
+  for the dedicated reading pane. Markdown is HTML-escaped and displayed as
   text, with its source layer and validation diagnostics.
 
 ### Compact job row

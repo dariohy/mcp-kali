@@ -447,10 +447,10 @@ prompt, authorization scope, tool policy, or behavior.
 The dashboard provides:
 
 - compact Active & queue and Finished history views;
-- a Tools view of registered Plugins and tools, declared command requirements,
-  and isolated unavailable-Plugin diagnostics;
-- a References view of packaged and operator-imported guidance, displayed as
-  escaped Markdown text with provenance and isolated diagnostics;
+- a searchable, Plugin-filtered Tools view with collapsible Plugin groups,
+  declared command requirements, and isolated unavailable-Plugin diagnostics;
+- a searchable, Plugin-filtered References index with a separate reading pane,
+  escaped Markdown text, provenance, and isolated diagnostics;
 - queue order, state, tool, command summary, and elapsed time;
 - a left-edge `>` control that expands full metadata and wrapped command text;
 - pause, resume, remove, and force-kill controls where applicable;
