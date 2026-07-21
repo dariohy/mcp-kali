@@ -161,11 +161,12 @@ async fn watch_reference_list(client: reqwest::Client, server: reqwest::Url, out
             previous = None;
             continue;
         };
-        if update_reference_snapshot(&mut previous, current)
-            && let Err(error) = write_shared(&output, &reference_list_changed_notification()).await
-        {
-            tracing::debug!(%error, "could not send reference-list change notification");
-            return;
+        if update_reference_snapshot(&mut previous, current) {
+            if let Err(error) = write_shared(&output, &reference_list_changed_notification()).await
+            {
+                tracing::debug!(%error, "could not send reference-list change notification");
+                return;
+            }
         }
     }
 }
