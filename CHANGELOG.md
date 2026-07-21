@@ -5,6 +5,19 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Private structured server logging with exclusive normal/error JSONL streams,
+  stdout fallback, SIGHUP reopen support, and installed user/system log paths.
+- A rendered system logrotate policy with daily rotation, compression, 30-file
+  retention, selected-account ownership, and coordinated service signaling.
+
+### Changed
+
+- Restrict HTTP tracing to method, path, status, and latency metadata while
+  keeping request bodies, query strings, command data, and job output out of
+  service logs.
+
 ## [2.2.1] - 2026-07-21
 
 ### Added

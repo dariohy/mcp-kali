@@ -1,0 +1,14 @@
+/var/log/mcp-kali/mcp-kali.jsonl /var/log/mcp-kali/mcp-kali.error.jsonl {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    su @MCP_KALI_USER@ @MCP_KALI_GROUP@
+    create 0600 @MCP_KALI_USER@ @MCP_KALI_GROUP@
+    sharedscripts
+    postrotate
+        /bin/systemctl kill --signal=SIGHUP mcp-kali.service >/dev/null 2>&1 || true
+    endscript
+}

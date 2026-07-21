@@ -10,7 +10,6 @@ use mcp_kali::{
 use std::{env, net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
-use tracing_subscriber::EnvFilter;
 
 /// Kali-side scheduler, API, and job-control dashboard.
 #[derive(Parser)]
@@ -177,13 +176,7 @@ async fn main() -> Result<()> {
             }
         }
     }
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "mcp_kali=info,tower_http=info".into()),
-        )
-        .with_writer(std::io::stderr)
-        .init();
+    let logging = mcp_kali::logging::init()?;
     if cli.max_concurrency == 0 || cli.max_concurrency > 256 {
         bail!("--max-concurrency must be between 1 and 256");
     }
@@ -242,6 +235,7 @@ async fn main() -> Result<()> {
             privilege_elevation: cli.privilege_elevation,
             reload_max_concurrency: !max_concurrency_from_environment && !max_concurrency_from_cli,
         },
+        logging,
     ));
     let result =
         mcp_kali::api::serve(cli.bind, scheduler.clone(), registry, shutdown.clone()).await;
@@ -265,6 +259,7 @@ async fn signal_loop(
     registry: Arc<RwLock<PluginRegistry>>,
     shutdown: CancellationToken,
     settings: ReloadSettings,
+    logging: mcp_kali::logging::LoggingHandle,
 ) {
     #[cfg(unix)]
     {
@@ -305,6 +300,11 @@ async fn signal_loop(
                     break;
                 }
                 _ = reload.recv() => {
+                    match logging.reopen() {
+                        Ok(true) => tracing::info!("log files reopened after SIGHUP"),
+                        Ok(false) => {}
+                        Err(error) => tracing::error!(%error, "could not reopen configured log files; using stdout"),
+                    }
                     reload_runtime(&scheduler, &registry, &settings).await;
                 }
                 _ = archive.recv() => {
@@ -339,7 +339,7 @@ async fn signal_loop(
     }
     #[cfg(not(unix))]
     {
-        let _ = (scheduler, registry, settings);
+        let _ = (scheduler, registry, settings, logging);
         shutdown.cancelled().await;
     }
 }
@@ -415,7 +415,6 @@ fn log_registry_diagnostics(registry: &PluginRegistry) {
         tracing::warn!(
             layer = %diagnostic.layer,
             path = %diagnostic.path,
-            message = %diagnostic.message,
             "plugin diagnostic"
         );
     }
@@ -423,7 +422,6 @@ fn log_registry_diagnostics(registry: &PluginRegistry) {
         tracing::warn!(
             layer = %diagnostic.layer,
             path = %diagnostic.path,
-            message = %diagnostic.message,
             "reference diagnostic"
         );
     }

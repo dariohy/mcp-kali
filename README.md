@@ -21,6 +21,7 @@ withdrawn because of system-installation and sudo-readiness defects.
 - [Build and install](#build-and-install)
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
+- [Service logging](#service-logging)
 - [Plugins and capabilities](#plugins-and-capabilities)
 - [MCP host setup](#mcp-host-setup)
 - [Dashboard and jobs](#dashboard-and-jobs)
@@ -95,9 +96,11 @@ target/release/mcp-kali-bridge
 │       └── <plugin>/
 │           ├── plugin.yaml
 │           └── references/*.md
-└── var/lib/
-    ├── jobs/                    # private durable job state and output
-    └── archive/jobs/            # timestamp-windowed .tar.gz terminal-job archives
+└── var/
+    ├── lib/
+    │   ├── jobs/                # private durable job state and output
+    │   └── archive/jobs/        # timestamp-windowed .tar.gz terminal-job archives
+    └── log/mcp-kali/            # split structured server logs
 ```
 
 If the MCP host needs only the bridge, use the smaller local installation:
@@ -139,6 +142,7 @@ the selected `MCP_KALI_HOME` tree and only matching `~/.local/bin` symlinks. As
 root, it stops and disables `mcp-kali.service`, then removes the system
 binaries, configuration, and active durable job state. Recoverable system job
 archives are preserved for the administrator.
+System service logs under `/var/log/mcp-kali` are also preserved.
 
 ### Systemd installation (Kali/Linux)
 
@@ -161,9 +165,10 @@ remain available when automation needs to force a mode.
 The system install places binaries under `/usr/local/bin`, immutable Plugin,
 catalog, and reference data under `/usr/lib/mcp-kali`, administrator overlays
 under `/etc/mcp-kali`, private state under `/var/lib/mcp-kali/jobs`, recoverable
-archives under `/var/lib/mcp-kali/archive/jobs`, and the generated unit at
+archives under `/var/lib/mcp-kali/archive/jobs`, structured logs under
+`/var/log/mcp-kali`, a rotation policy under `/etc/logrotate.d/mcp-kali`, and the generated unit at
 `/usr/lib/systemd/system/mcp-kali.service`. Review the configuration and
-sudoers policy before enabling it. Use `make status-system`, `make logs-system`,
+sudoers policy before enabling it. Use `make status-system`, `make logs-json-system`,
 and `make archive-jobs-system` for operations; `systemctl reload mcp-kali` maps
 to `SIGHUP`. The service runs from the selected service user's home directory;
 standalone runs retain the invoking shell's working directory.
@@ -241,9 +246,10 @@ not accept the prior `--env-file` / `MCP_KALI_ENV_FILE` selectors.
 |---|---|---:|---|
 | `MCP_KALI_HOME` | Both | `~/.mcp-kali` | Root of the self-contained per-user tree |
 | `MCP_KALI_CONFIG_FILE` | Both | `/etc/mcp-kali/mcp-kali.conf` when present, otherwise `~/.mcp-kali/etc/mcp-kali.conf` | Alternate configuration-file path |
-| `RUST_LOG` | Both | Binary-specific info filter | Tracing filter; logs go to stderr |
+| `RUST_LOG` | Both | Binary-specific info filter | Tracing filter; server output follows `MCP_KALI_LOG_DIR`, while bridge diagnostics stay on stderr |
 | `MCP_KALI_BIND` | Server | `127.0.0.1:5000` | HTTP API/dashboard bind address |
 | `MCP_KALI_STATE_DIR` | Server | `~/.mcp-kali/var/lib/jobs` | Private durable job directory |
+| `MCP_KALI_LOG_DIR` | Server | Installed configuration sets a user or system log directory; otherwise unset | Existing writable directory for split JSONL logs; absent or unusable falls back to stdout |
 | `MCP_KALI_JOB_ARCHIVE_DIR` | Server | `~/.mcp-kali/var/lib/archive/jobs` | Private recoverable archive for terminal jobs |
 | `MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES` | Server | `60` | Minimum terminal-job age used by `SIGUSR1`, range 1–5256000 minutes |
 | `MCP_KALI_MAX_CONCURRENCY` | Server | `2` | Simultaneous jobs, range 1–256 |
@@ -263,9 +269,48 @@ is not moved automatically. To retain access to it, either set
 move the directories to the new layout while the server is stopped.
 
 CLI flags matching these settings are documented by each binary's `--help`.
+`MCP_KALI_LOG_DIR` is configuration/environment-only and has no CLI flag.
 Sensitive command values should be supplied through MCP job arguments and are
 redacted from public records by default; do not put secrets directly in process
 arguments unless the target tool requires them.
+
+## Service logging
+
+When `MCP_KALI_LOG_DIR` names an existing writable non-symlink directory, the
+server writes newline-delimited JSON with UTC event timestamps to two fixed
+private files:
+
+```text
+mcp-kali.jsonl        # TRACE, DEBUG, and INFO only
+mcp-kali.error.jsonl  # WARN and ERROR only
+```
+
+Events are exclusive to one file. Both files use mode `0600`; installed log
+directories use `0700`. If the variable is absent or either file cannot be
+opened, all server tracing uses human-readable stdout instead. The stdio bridge
+is unchanged: its protocol stays on stdout and its diagnostics stay on stderr.
+
+System installations include daily logrotate configuration with 30 rotations,
+compression, and a post-rotation SIGHUP. SIGHUP flushes and reopens both fixed
+filenames before performing the existing runtime reload. Changing the configured
+directory still requires a service restart.
+
+```bash
+sudo make logs-json-system
+sudo tail -F /var/log/mcp-kali/mcp-kali.jsonl \
+  /var/log/mcp-kali/mcp-kali.error.jsonl
+sudo jq -c 'select(.level == "ERROR")' /var/log/mcp-kali/mcp-kali.error.jsonl
+sudo journalctl -u mcp-kali.service -f  # stdout fallback and process diagnostics
+```
+
+rsyslog can follow `/var/log/mcp-kali/mcp-kali*.jsonl` with `imfile`, and
+syslog-ng can use a `wildcard-file()` source followed by `json-parser()`. Their
+service identities must be able to traverse the private directory. Configure
+persistent file offsets and exclude rotated/compressed names to avoid replay.
+
+Service events never contain request bodies, command arguments, webhook
+payloads, job output, or captured artifacts. Job stdout/stderr remains only in
+`STATE_DIR/<job-id>/`; log shippers must treat both trees as separate data.
 
 ## Plugins and capabilities
 
@@ -374,7 +419,8 @@ notifications when either projection changes.
 `SIGTERM` (and `SIGINT`) performs a graceful shutdown: the server stops
 accepting jobs, cancels queued work, sends `SIGTERM` to active job process
 groups, waits up to 10 seconds, then force-kills survivors and persists their
-terminal state before exiting. `SIGHUP` atomically reloads the
+terminal state before exiting. `SIGHUP` flushes and reopens configured server
+log files, then atomically reloads the
 Plugin/catalog/reference runtime. When `MCP_KALI_MAX_CONCURRENCY` comes from the loaded
 configuration file rather than an environment variable or CLI flag, `SIGHUP`
 also applies its new value without interrupting running jobs. A lower limit
@@ -456,7 +502,8 @@ the target directory is in `fpath`, then run `compinit`.
 ## Output contracts
 
 - MCP protocol JSON is written only to client stdout, one JSON-RPC object per
-  line. Diagnostics and tracing go to stderr.
+  line. Bridge diagnostics and tracing go to stderr. Server tracing uses split
+  JSONL when configured and otherwise falls back to stdout.
 - HTTP endpoints return JSON except the dashboard and full-log downloads.
 - Job states are `queued`, `running`, `paused`, `succeeded`, `failed`,
   `timed_out`, `cancelled`, and `interrupted`.

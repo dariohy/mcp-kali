@@ -6,6 +6,7 @@
 RUST_LOG=mcp_kali=info,tower_http=info
 MCP_KALI_BIND=127.0.0.1:5000
 MCP_KALI_STATE_DIR=/var/lib/mcp-kali/jobs
+MCP_KALI_LOG_DIR=/var/log/mcp-kali
 MCP_KALI_JOB_ARCHIVE_DIR=/var/lib/mcp-kali/archive/jobs
 MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES=60
 # Read-only packaged Plugins, references, and the capability catalog.

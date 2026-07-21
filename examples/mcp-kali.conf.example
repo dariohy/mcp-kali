@@ -9,6 +9,8 @@ RUST_LOG=mcp_kali=info,tower_http=info
 # MCP_KALI_BIND=127.0.0.1:5000
 # MCP_KALI_HOME=/home/your-user/.mcp-kali
 # MCP_KALI_STATE_DIR=/home/your-user/.mcp-kali/var/lib/jobs
+# Fixed structured server logs. `make install-local` renders and enables this.
+# MCP_KALI_LOG_DIR=/home/your-user/.mcp-kali/var/log/mcp-kali
 # Recoverable terminal-job archive. SIGUSR1 uses the configured minute threshold.
 # MCP_KALI_JOB_ARCHIVE_DIR=/home/your-user/.mcp-kali/var/lib/archive/jobs
 MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES=60

@@ -22,6 +22,8 @@ RestartSec=2s
 TimeoutStopSec=15s
 UMask=0077
 StateDirectory=mcp-kali
+LogsDirectory=mcp-kali
+LogsDirectoryMode=0700
 ProtectSystem=full
 PrivateTmp=true
 

@@ -963,7 +963,17 @@ impl Scheduler {
             persist_terminal_at(&self.inner.root, job).await?;
             job.clone()
         };
-        info!(%id, state = ?completed.state, "job finished");
+        let duration_ms = completed
+            .started_at
+            .zip(completed.finished_at)
+            .map(|(started, finished)| (finished - started).num_milliseconds().max(0));
+        info!(
+            %id,
+            tool = %completed.tool,
+            state = ?completed.state,
+            duration_ms,
+            "job finished"
+        );
         self.send_webhook(&completed).await;
         Ok(())
     }

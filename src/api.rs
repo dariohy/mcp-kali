@@ -66,7 +66,15 @@ pub async fn serve(
         .route("/api/tools", get(tools))
         .route("/api/tools/{tool_name}/invoke", post(invoke_tool))
         .layer(DefaultBodyLimit::max(512 * 1024))
-        .layer(TraceLayer::new_for_http())
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<Body>| {
+                tracing::info_span!(
+                    "http_request",
+                    method = %request.method(),
+                    path = %request.uri().path()
+                )
+            }),
+        )
         .with_state(state);
     let listener = tokio::net::TcpListener::bind(address).await?;
     tracing::info!(%address, "HTTP server listening");
