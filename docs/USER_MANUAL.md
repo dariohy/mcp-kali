@@ -186,8 +186,8 @@ This creates a non-root, self-contained user installation:
 ~/.mcp-kali/
 ├── bin/                         # executable binaries
 ├── etc/
-│   ├── mcp-kali.config          # normal, non-secret ready-to-run configuration
-│   ├── mcp-kali.config.example  # reference for every available setting
+│   ├── mcp-kali.conf            # normal, non-secret ready-to-run configuration
+│   ├── mcp-kali.conf.example    # reference for every available setting
 │   ├── plugins/                 # administrator Plugin/catalog overlay
 │   └── references/              # operator reference overlay
 ├── share/
@@ -212,8 +212,8 @@ installation and a system-wide service installation.
 |---|---|---|---|
 | Server and bridge binaries | `~/.mcp-kali/bin/` | `/usr/local/bin/` | `mcp-kali` and `mcp-kali-bridge` executables |
 | User command symlinks | `~/.local/bin/` | — | Convenience symlinks to the local binaries |
-| Main configuration | `~/.mcp-kali/etc/mcp-kali.config` | `/etc/mcp-kali/mcp-kali.config` | Normal, non-secret ready-to-run configuration |
-| Configuration reference | `~/.mcp-kali/etc/mcp-kali.config.example` | `/etc/mcp-kali/mcp-kali.config.example` | All settings, defaults, limits, and logging policy |
+| Main configuration | `~/.mcp-kali/etc/mcp-kali.conf` | `/etc/mcp-kali/mcp-kali.conf` | Normal, non-secret ready-to-run configuration |
+| Configuration reference | `~/.mcp-kali/etc/mcp-kali.conf.example` | `/etc/mcp-kali/mcp-kali.conf.example` | All settings, defaults, limits, and logging policy |
 | Plugin overlay | `~/.mcp-kali/etc/plugins/` | `/etc/mcp-kali/plugins/` | Administrator-supplied Plugin and catalog overrides |
 | Reference overlay | `~/.mcp-kali/etc/references/` | `/etc/mcp-kali/references/` | Operator-imported Markdown reference guides |
 | Packaged data | `~/.mcp-kali/share/plugins/` | `/usr/lib/mcp-kali/plugins/` | Read-only bundled Plugins, catalog, and references |
@@ -281,13 +281,13 @@ hardcoded default
 The default configuration file is:
 
 ```text
-~/.mcp-kali/etc/mcp-kali.config
+~/.mcp-kali/etc/mcp-kali.conf
 ```
 
 Choose another path with:
 
 ```bash
-mcp-kali --config-file /path/to/mcp-kali.config
+mcp-kali --config-file /path/to/mcp-kali.conf
 ```
 
 An explicitly selected missing file is an error. A missing default file is
@@ -301,9 +301,9 @@ passwords, or tokens in it.
 make install-local
 ```
 
-The installer renders the path placeholders in `examples/mcp-kali.config` for
+The installer renders the path placeholders in `examples/mcp-kali.conf` for
 the chosen user or system installation; do not copy that source template
-directly. The installed `mcp-kali.config` is ready to launch.
+directly. The installed `mcp-kali.conf` is ready to launch.
 
 ### Shared variables
 
@@ -456,9 +456,9 @@ account's home directory; outside systemd, mcp-kali leaves the invoking
 process's working directory unchanged.
 
 Without an explicit `--config-file`, the binaries use
-`/etc/mcp-kali/mcp-kali.config` when it exists; otherwise they use the normal
-per-user `~/.mcp-kali/etc/mcp-kali.config` fallback. Legacy `.conf` paths are
-consulted only when neither canonical file exists.
+`/etc/mcp-kali/mcp-kali.conf` when it exists; otherwise they use the normal
+per-user `~/.mcp-kali/etc/mcp-kali.conf` fallback. The accidental `.config`
+paths are consulted only when neither canonical file exists.
 
 ### Runtime signals
 
@@ -553,7 +553,7 @@ That override is intended only for isolated labs.
 }
 ```
 
-If settings live in `~/.mcp-kali/etc/mcp-kali.config`, the `args` array can be
+If settings live in `~/.mcp-kali/etc/mcp-kali.conf`, the `args` array can be
 empty.
 
 The MCP host launches the bridge locally, so `command` must be an absolute path
@@ -1587,7 +1587,7 @@ longer a built-in adapter; authorized operators may use the privileged
 argv-only Core tool until a dedicated reviewed Plugin contract exists.
 
 Version 2.0.0 also removes the legacy configuration path and selectors. Create
-`~/.mcp-kali/etc/mcp-kali.config` and use `--config-file` for an alternate
+`~/.mcp-kali/etc/mcp-kali.conf` and use `--config-file` for an alternate
 path; `mcp-kali.env`, `~/.envs/.env_mcp-kali`, `--env-file`, and
 `MCP_KALI_ENV_FILE` are not recognized.
 

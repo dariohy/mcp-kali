@@ -22,8 +22,8 @@ All notable changes to MCP Kali are documented here. The project follows
   service logs.
 - Raise default scheduler concurrency to 4 and default job timeout to five days
   while retaining the seven-day maximum.
-- Consolidate configuration into a ready-to-run `mcp-kali.config` and a sibling
-  `mcp-kali.config.example` reference with `RUST_LOG` guidance and safe limits.
+- Consolidate configuration into a ready-to-run `mcp-kali.conf` and a sibling
+  `mcp-kali.conf.example` reference with `RUST_LOG` guidance and safe limits.
 
 ## [2.2.1] - 2026-07-21
 
@@ -166,7 +166,7 @@ All notable changes to MCP Kali are documented here. The project follows
   under `~/.mcp-kali` with `bin`, `etc`, `share/plugins`, and `var/jobs`.
 - User installation creates or updates safe `~/.local/bin` symlinks for both
   MCP Kali binaries.
-- Replaced the per-user `.env` contract with a non-secret `mcp-kali.config`
+- Replaced the per-user `.env` contract with a non-secret `mcp-kali.conf`
   configuration file and the canonical `--config-file`
   selectors.
 - Moved the shipped Capability Catalog into the Plugin data directory and made

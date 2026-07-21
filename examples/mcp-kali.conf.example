@@ -1,14 +1,14 @@
 # MCP Kali configuration reference
 #
 # This file documents every supported configuration setting. The installer puts
-# it beside the active mcp-kali.config. It is non-secret: never put passwords,
+# it beside the active mcp-kali.conf. It is non-secret: never put passwords,
 # tokens, credentials, command arguments, request bodies, webhook URLs, or job
 # output in either file.
 #
-# Precedence (low to high): built-in defaults, selected mcp-kali.config,
+# Precedence (low to high): built-in defaults, selected mcp-kali.conf,
 # pre-existing shell environment, then command-line flags. MCP_KALI_LOG_DIR has
-# no CLI flag. The legacy mcp-kali.conf name is accepted only as a migration
-# fallback when neither canonical mcp-kali.config path exists.
+# no CLI flag. The accidental mcp-kali.config name is accepted only as a
+# migration fallback when the canonical mcp-kali.conf path does not exist.
 
 # RUST_LOG controls normal tracing verbosity for server and bridge:
 #   error < warn < info < debug < trace

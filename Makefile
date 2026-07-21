@@ -11,9 +11,9 @@ ARCHIVE_DIR ?= $(MCP_KALI_HOME)/var/lib/archive/jobs
 LOG_DIR ?= $(MCP_KALI_HOME)/var/log/mcp-kali
 PLUGIN_DIR := $(DATA_DIR)/plugins
 REFERENCE_OVERLAY_DIR := $(CONFIG_DIR)/references
-CONFIG_FILE := $(CONFIG_DIR)/mcp-kali.config
-CONFIG_EXAMPLE_FILE := $(CONFIG_DIR)/mcp-kali.config.example
-LEGACY_CONFIG_FILE := $(CONFIG_DIR)/mcp-kali.conf
+CONFIG_FILE := $(CONFIG_DIR)/mcp-kali.conf
+CONFIG_EXAMPLE_FILE := $(CONFIG_DIR)/mcp-kali.conf.example
+LEGACY_CONFIG_FILE := $(CONFIG_DIR)/mcp-kali.config
 LOCAL_BIN_DIR ?= $(HOME)/.local/bin
 COMPLETION_DIR := target/completions
 SECURITY_DIR := target/security
@@ -29,9 +29,9 @@ SYSTEMD_UNIT_DIR ?= /usr/lib/systemd/system
 LOGROTATE_DIR ?= /etc/logrotate.d
 MCP_KALI_USER ?= kali
 MCP_KALI_GROUP ?= $(MCP_KALI_USER)
-SYSTEM_CONFIG_FILE := $(SYSTEM_CONFIG_DIR)/mcp-kali.config
-SYSTEM_CONFIG_EXAMPLE_FILE := $(SYSTEM_CONFIG_DIR)/mcp-kali.config.example
-SYSTEM_LEGACY_CONFIG_FILE := $(SYSTEM_CONFIG_DIR)/mcp-kali.conf
+SYSTEM_CONFIG_FILE := $(SYSTEM_CONFIG_DIR)/mcp-kali.conf
+SYSTEM_CONFIG_EXAMPLE_FILE := $(SYSTEM_CONFIG_DIR)/mcp-kali.conf.example
+SYSTEM_LEGACY_CONFIG_FILE := $(SYSTEM_CONFIG_DIR)/mcp-kali.config
 SYSTEM_UNIT_FILE := $(SYSTEMD_UNIT_DIR)/mcp-kali.service
 SYSTEM_LOG_DIR := /var/log/mcp-kali
 SYSTEM_LOGROTATE_FILE := $(LOGROTATE_DIR)/mcp-kali
@@ -136,6 +136,7 @@ install-local: release
 	@if [ ! -e "$(CONFIG_FILE)" ] && [ -e "$(LEGACY_CONFIG_FILE)" ]; then \
 		mv "$(LEGACY_CONFIG_FILE)" "$(CONFIG_FILE)"; \
 	fi
+	@rm -f "$(CONFIG_DIR)/mcp-kali.config.example"
 	@if [ ! -e "$(CONFIG_FILE)" ]; then \
 		sed -e 's|@MCP_KALI_HOME@|$(abspath $(MCP_KALI_HOME))|g' \
 			-e 's|@MCP_KALI_STATE_DIR@|$(abspath $(STATE_DIR))|g' \
@@ -143,10 +144,10 @@ install-local: release
 			-e 's|@MCP_KALI_JOB_ARCHIVE_DIR@|$(abspath $(ARCHIVE_DIR))|g' \
 			-e 's|@MCP_KALI_SYSTEM_DATA_DIR@|$(abspath $(DATA_DIR))|g' \
 			-e 's|@MCP_KALI_CONFIG_DIR@|$(abspath $(CONFIG_DIR))|g' \
-			"examples/mcp-kali.config" > "$(CONFIG_FILE)"; \
+			"examples/mcp-kali.conf" > "$(CONFIG_FILE)"; \
 		chmod 0644 "$(CONFIG_FILE)"; \
 	fi
-	install -m 0644 "examples/mcp-kali.config.example" "$(CONFIG_EXAMPLE_FILE)"
+	install -m 0644 "examples/mcp-kali.conf.example" "$(CONFIG_EXAMPLE_FILE)"
 	install -m 0755 "target/release/$(SERVER_BIN)" "$(INSTALL_DIR)/$(SERVER_BIN)"
 	install -m 0755 "target/release/$(CLIENT_BIN)" "$(INSTALL_DIR)/$(CLIENT_BIN)"
 	@for binary in "$(SERVER_BIN)" "$(CLIENT_BIN)"; do \
@@ -214,6 +215,7 @@ install-system: release
 	@if [ ! -e "$(SYSTEM_CONFIG_FILE)" ] && [ -e "$(SYSTEM_LEGACY_CONFIG_FILE)" ]; then \
 		mv "$(SYSTEM_LEGACY_CONFIG_FILE)" "$(SYSTEM_CONFIG_FILE)"; \
 	fi
+	rm -f "$(SYSTEM_CONFIG_DIR)/mcp-kali.config.example"
 	@if [ ! -e "$(SYSTEM_CONFIG_FILE)" ]; then \
 		service_home="$$(getent passwd "$(MCP_KALI_USER)" | awk -F: 'NR == 1 { print $$6 }')"; \
 		sed -e 's|@MCP_KALI_HOME@|'"$$service_home"'|g' \
@@ -222,10 +224,10 @@ install-system: release
 			-e 's|@MCP_KALI_JOB_ARCHIVE_DIR@|$(SYSTEM_ARCHIVE_DIR)|g' \
 			-e 's|@MCP_KALI_SYSTEM_DATA_DIR@|$(SYSTEM_DATA_DIR)|g' \
 			-e 's|@MCP_KALI_CONFIG_DIR@|$(SYSTEM_CONFIG_DIR)|g' \
-			"examples/mcp-kali.config" > "$(SYSTEM_CONFIG_FILE)"; \
+			"examples/mcp-kali.conf" > "$(SYSTEM_CONFIG_FILE)"; \
 		chmod 0644 "$(SYSTEM_CONFIG_FILE)"; \
 	fi
-	install -m 0644 "examples/mcp-kali.config.example" "$(SYSTEM_CONFIG_EXAMPLE_FILE)"
+	install -m 0644 "examples/mcp-kali.conf.example" "$(SYSTEM_CONFIG_EXAMPLE_FILE)"
 	@service_home="$$(getent passwd "$(MCP_KALI_USER)" | awk -F: 'NR == 1 { print $$6 }')"; \
 		sed -e 's|@MCP_KALI_USER@|$(MCP_KALI_USER)|g' -e 's|@MCP_KALI_GROUP@|$(MCP_KALI_GROUP)|g' -e 's|@MCP_KALI_HOME@|'"$$service_home"'|g' -e 's|@MCP_KALI_BIN@|$(SYSTEM_BIN_DIR)/$(SERVER_BIN)|g' -e 's|@MCP_KALI_CONFIG_PATH@|$(SYSTEM_CONFIG_FILE)|g' -e 's|@MCP_KALI_SYSTEM_DATA_DIR@|$(SYSTEM_DATA_DIR)|g' -e 's|@MCP_KALI_CONFIG_DIR@|$(SYSTEM_CONFIG_DIR)|g' "systemd/mcp-kali.service.in" > "$(SYSTEM_UNIT_FILE)"
 	chmod 0644 "$(SYSTEM_UNIT_FILE)"

@@ -87,8 +87,8 @@ target/release/mcp-kali-bridge
 ~/.mcp-kali/
 ├── bin/                         # mcp-kali and mcp-kali-bridge
 ├── etc/
-│   ├── mcp-kali.config          # normal, non-secret ready-to-run configuration
-│   ├── mcp-kali.config.example  # reference for every available setting
+│   ├── mcp-kali.conf            # normal, non-secret ready-to-run configuration
+│   ├── mcp-kali.conf.example    # reference for every available setting
 │   ├── plugins/                 # administrator Plugin/catalog overlay
 │   └── references/              # operator-imported reference overlay
 ├── share/
@@ -175,9 +175,9 @@ to `SIGHUP`. The service runs from the selected service user's home directory;
 standalone runs retain the invoking shell's working directory.
 
 Without `--config-file`, MCP Kali uses
-`/etc/mcp-kali/mcp-kali.config` if it exists. If it does not, it falls back to
-the per-user `~/.mcp-kali/etc/mcp-kali.config` lookup. Legacy `.conf` files are
-used only when neither canonical `.config` file exists.
+`/etc/mcp-kali/mcp-kali.conf` if it exists. If it does not, it falls back to
+the per-user `~/.mcp-kali/etc/mcp-kali.conf` lookup. The accidental `.config`
+name is used only as a migration fallback when neither canonical `.conf` file exists.
 
 Release builds use size optimization, full LTO, one codegen unit, stripped
 symbols, and abort-on-panic behavior. No scheduler, API, dashboard, or MCP
@@ -224,12 +224,12 @@ Configuration precedence, from lowest to highest, is:
 
 ```text
 hardcoded defaults
--> /etc/mcp-kali/mcp-kali.config when present, otherwise ~/.mcp-kali/etc/mcp-kali.config (or selected config file)
+-> /etc/mcp-kali/mcp-kali.conf when present, otherwise ~/.mcp-kali/etc/mcp-kali.conf (or selected config file)
 -> existing shell environment
 -> command-line arguments
 ```
 
-`make install-local` renders `~/.mcp-kali/etc/mcp-kali.config` if it does not
+`make install-local` renders `~/.mcp-kali/etc/mcp-kali.conf` if it does not
 already exist. The file uses a simple `KEY=VALUE` syntax and must not contain
 secrets. The repository template contains install-path placeholders, so use the
 installer rather than copying it directly:
@@ -599,8 +599,8 @@ development builds.
 - [Support guide](SUPPORT.md)
 - [Code of conduct](CODE_OF_CONDUCT.md)
 - [Publishing and release guide](docs/PUBLISHING.md)
-- [Default configuration template](examples/mcp-kali.config)
-- [Configuration reference](examples/mcp-kali.config.example)
+- [Default configuration template](examples/mcp-kali.conf)
+- [Configuration reference](examples/mcp-kali.conf.example)
 
 ## License and upstream attribution
 
