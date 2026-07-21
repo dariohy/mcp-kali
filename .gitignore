@@ -8,4 +8,4 @@
 .DS_Store
 
 # Local working context for AI-assisted development. Never commit this.
-/ai_context/
+/context/
