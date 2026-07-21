@@ -3,7 +3,7 @@ kind: Plugin
 metadata:
   id: org.mcp-kali.nmap
   name: Nmap
-  version: 2.0.0
+  version: 2.0.1
   description: Safe, repeatable Nmap discovery, inventory, and configuration-audit profiles.
 categories: [information-gathering]
 tags: [network, discovery, inventory]
@@ -29,7 +29,7 @@ tools:
           pattern: "^[A-Za-z0-9][A-Za-z0-9.:_/%-]{0,252}$"
     execution:
       program: nmap
-      args: [-sn, "{{target}}"]
+      args: [--unprivileged, -sn, "{{target}}"]
     policy:
       timeout_seconds: 600
   - metadata:
@@ -77,6 +77,7 @@ tools:
     execution:
       program: nmap
       args:
+        - --unprivileged
         - -sT
         - -sV
         - when: ports
@@ -182,7 +183,7 @@ tools:
           pattern: "^[A-Za-z0-9][A-Za-z0-9.:_/%-]{0,252}$"
     execution:
       program: nmap
-      args: [-sT, -sV, -p, "443,8443", --script, ssl-enum-ciphers, "{{target}}"]
+      args: [--unprivileged, -sT, -sV, -p, "443,8443", --script, ssl-enum-ciphers, "{{target}}"]
     policy:
       timeout_seconds: 1800
   - metadata:
@@ -202,7 +203,7 @@ tools:
           pattern: "^[A-Za-z0-9][A-Za-z0-9.:_/%-]{0,252}$"
     execution:
       program: nmap
-      args: [-sT, -p, "445", --script, "smb-protocols,smb-security-mode,smb2-security-mode", "{{target}}"]
+      args: [--unprivileged, -sT, -p, "445", --script, "smb-protocols,smb-security-mode,smb2-security-mode", "{{target}}"]
     policy:
       timeout_seconds: 1800
   - metadata:
@@ -222,6 +223,6 @@ tools:
           pattern: "^[A-Za-z0-9][A-Za-z0-9.:_/%-]{0,252}$"
     execution:
       program: nmap
-      args: [-sT, -sV, -p, "80,443,8080,8443", --script, "http-title,http-auth", "{{target}}"]
+      args: [--unprivileged, -sT, -sV, -p, "80,443,8080,8443", --script, "http-title,http-auth", "{{target}}"]
     policy:
       timeout_seconds: 1800

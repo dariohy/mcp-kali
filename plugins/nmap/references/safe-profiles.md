@@ -33,15 +33,17 @@ Use these tools only for systems and ranges that the operator is authorized to a
 
 ## Tool selection
 
-- `nmap_host_discovery` checks whether hosts respond without scanning their ports. It runs as the server user and is the normal starting point.
+- `nmap_host_discovery` checks whether hosts respond without scanning their ports. It runs as the server user, explicitly selects Nmap's unprivileged mode, and is the normal starting point.
 - `nmap_arp_host_discovery` uses ARP on a directly connected local network. It requires root and is inappropriate for routed or external targets.
-- `nmap_service_scan` uses TCP connect scanning and service/version detection. Use it when root access is unnecessary or unavailable.
+- `nmap_service_scan` uses explicit unprivileged TCP connect scanning and service/version detection. Use it when root access is unnecessary or unavailable.
 - `nmap_syn_service_scan` uses privileged SYN probes with service/version detection. Use it only when the operator deliberately selects the root-required profile.
 - `nmap_udp_service_scan` probes only the explicit UDP ports supplied by the caller. UDP scans can be slow and ambiguous, so keep the port set small.
 - `nmap_os_detection` performs privileged OS fingerprinting. Results are estimates and work best when Nmap observes both an open and a closed TCP port.
 - `nmap_tls_audit` evaluates TLS configuration on ports 443 and 8443 with the packaged `ssl-enum-ciphers` NSE script.
 - `nmap_smb_security_audit` reports SMB dialect and security-mode information on TCP 445 without attempting credential use or share modification.
 - `nmap_web_inventory` inventories common HTTP ports and obtains page titles and advertised authentication methods.
+
+Every profile that runs as the server user passes `--unprivileged` explicitly. This prevents Nmap launchers or capability-detection behavior from selecting raw-socket discovery before a TCP connect scan. The ARP, SYN, UDP, and OS profiles deliberately remain root-required and do not use this override.
 
 ## Input boundaries
 

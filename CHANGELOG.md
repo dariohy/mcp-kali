@@ -55,6 +55,10 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ### Fixed
 
+- Force Nmap's explicit unprivileged mode for normal host discovery, TCP
+  connect scans, and the packaged TLS, SMB, and web profiles so non-root
+  service execution does not attempt raw sockets through privilege-assuming
+  Nmap launchers.
 - Preserve Nmap's `-p` port argument in public command displays while still
   redacting Hydra and Medusa password arguments.
 - Include the HTTP status, response content type, and body length in MCP bridge

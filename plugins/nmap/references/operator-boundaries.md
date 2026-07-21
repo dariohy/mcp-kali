@@ -33,7 +33,7 @@ The declarative Nmap tools are repeatable execution profiles, not authorization 
 
 ## Privilege
 
-Root is declared only for ARP discovery, SYN scanning, UDP scanning, and OS fingerprinting. In automatic elevation mode MCP Kali uses non-interactive sudo only after confirming authorization for the resolved Nmap executable. Normal host discovery, TCP connect scans, and the packaged application-layer NSE profiles run as the server user.
+Root is declared only for ARP discovery, SYN scanning, UDP scanning, and OS fingerprinting. In automatic elevation mode MCP Kali uses non-interactive sudo only after confirming authorization for the resolved Nmap executable. Normal host discovery, TCP connect scans, and the packaged application-layer NSE profiles run as the server user and pass Nmap's `--unprivileged` option explicitly. This is required on systems whose Nmap launcher otherwise assumes privileged raw-socket access for a non-root process.
 
 Do not select a root-required tool merely because elevation is available. Select it because the probe type requires it.
 
