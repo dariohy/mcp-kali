@@ -5,7 +5,7 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ## [Unreleased]
 
-## [2.2.0] - 2026-07-21
+## [2.2.1] - 2026-07-21
 
 ### Added
 
@@ -65,6 +65,7 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ### Fixed
 
+- Restore Rust 1.86 compatibility for MCP reference-list change notifications.
 - Force Nmap's explicit unprivileged mode for normal host discovery, TCP
   connect scans, and the packaged TLS, SMB, and web profiles so non-root
   service execution does not attempt raw sockets through privilege-assuming
@@ -252,8 +253,8 @@ All notable changes to MCP Kali are documented here. The project follows
 - There is no automatic job-retention policy; operators must manage the private
   state directory according to their evidence-retention requirements.
 
-[Unreleased]: https://github.com/dariohy/mcp-kali/compare/v2.2.0...HEAD
-[2.2.0]: https://github.com/dariohy/mcp-kali/compare/v2.1.1...v2.2.0
+[Unreleased]: https://github.com/dariohy/mcp-kali/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/dariohy/mcp-kali/compare/v2.1.1...v2.2.1
 [2.1.1]: https://github.com/dariohy/mcp-kali/releases/tag/v2.1.1
 [2.0.0]: https://github.com/dariohy/mcp-kali/releases/tag/v2.0.0
 [1.1.0]: https://github.com/dariohy/mcp-kali/releases/tag/v1.1.0
