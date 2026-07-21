@@ -95,7 +95,9 @@ target/release/mcp-kali-bridge
 │       └── <plugin>/
 │           ├── plugin.yaml
 │           └── references/*.md
-└── var/jobs/                    # private durable job state and output
+└── var/lib/
+    ├── jobs/                    # private durable job state and output
+    └── archive/jobs/            # recoverable terminal-job archives
 ```
 
 If the MCP host needs only the bridge, use the smaller local installation:
@@ -241,8 +243,8 @@ not accept the prior `--env-file` / `MCP_KALI_ENV_FILE` selectors.
 | `MCP_KALI_CONFIG_FILE` | Both | `/etc/mcp-kali/mcp-kali.conf` when present, otherwise `~/.mcp-kali/etc/mcp-kali.conf` | Alternate configuration-file path |
 | `RUST_LOG` | Both | Binary-specific info filter | Tracing filter; logs go to stderr |
 | `MCP_KALI_BIND` | Server | `127.0.0.1:5000` | HTTP API/dashboard bind address |
-| `MCP_KALI_STATE_DIR` | Server | `~/.mcp-kali/var/jobs` | Private durable job directory |
-| `MCP_KALI_JOB_ARCHIVE_DIR` | Server | `~/.mcp-kali/var/archive/jobs` | Private recoverable archive for terminal jobs |
+| `MCP_KALI_STATE_DIR` | Server | `~/.mcp-kali/var/lib/jobs` | Private durable job directory |
+| `MCP_KALI_JOB_ARCHIVE_DIR` | Server | `~/.mcp-kali/var/lib/archive/jobs` | Private recoverable archive for terminal jobs |
 | `MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES` | Server | `60` | Minimum terminal-job age used by `SIGUSR1`, range 1–5256000 minutes |
 | `MCP_KALI_MAX_CONCURRENCY` | Server | `2` | Simultaneous jobs, range 1–256 |
 | `MCP_KALI_DEFAULT_TIMEOUT` | Server | `1800` | Default wall timeout, range 1–604800 seconds |
@@ -254,6 +256,11 @@ not accept the prior `--env-file` / `MCP_KALI_ENV_FILE` selectors.
 | `MCP_KALI_ALLOW_REMOTE_BIND` | Server | `false` | Acknowledge an unauthenticated non-loopback bind |
 | `MCP_KALI_SERVER` | Client | `http://127.0.0.1:5000` | Server origin URL |
 | `MCP_KALI_ALLOW_INSECURE_HTTP` | Client | `false` | Permit HTTP to a non-loopback server |
+
+Local state created by earlier releases remains at `~/.mcp-kali/var/jobs` and
+is not moved automatically. To retain access to it, either set
+`MCP_KALI_STATE_DIR` and `MCP_KALI_JOB_ARCHIVE_DIR` to the old locations, or
+move the directories to the new layout while the server is stopped.
 
 CLI flags matching these settings are documented by each binary's `--help`.
 Sensitive command values should be supplied through MCP job arguments and are
@@ -508,7 +515,7 @@ development builds.
 
 ## Troubleshooting
 
-- **Cannot write job state:** verify `~/.mcp-kali/var/jobs` is owned by the
+- **Cannot write job state:** verify `~/.mcp-kali/var/lib/jobs` is owned by the
   current user, or pass a writable `--state-dir`.
 - **Remote bind refused:** use loopback plus SSH, or explicitly pass
   `--allow-remote-bind` only after adding network access controls.

@@ -36,6 +36,9 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ### Changed
 
+- Align per-user durable state with the system layout: active jobs now default
+  to `~/.mcp-kali/var/lib/jobs` and recoverable archives to
+  `~/.mcp-kali/var/lib/archive/jobs`.
 - Install immutable Plugin, capability, and reference data under
   `/usr/lib/mcp-kali`, keep administrator overlays under `/etc/mcp-kali`, and
   install the service unit under `/usr/lib/systemd/system`.

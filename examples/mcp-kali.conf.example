@@ -8,9 +8,9 @@ RUST_LOG=mcp_kali=info,tower_http=info
 # mcp-kali. Uncomment only to override the user-install defaults.
 # MCP_KALI_BIND=127.0.0.1:5000
 # MCP_KALI_HOME=/home/your-user/.mcp-kali
-# MCP_KALI_STATE_DIR=/home/your-user/.mcp-kali/var/jobs
+# MCP_KALI_STATE_DIR=/home/your-user/.mcp-kali/var/lib/jobs
 # Recoverable terminal-job archive. SIGUSR1 uses the configured minute threshold.
-# MCP_KALI_JOB_ARCHIVE_DIR=/home/your-user/.mcp-kali/var/archive/jobs
+# MCP_KALI_JOB_ARCHIVE_DIR=/home/your-user/.mcp-kali/var/lib/archive/jobs
 MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES=60
 # Read-only packaged Plugin, catalog, and reference data.
 # MCP_KALI_SYSTEM_DATA_DIR=/home/your-user/.mcp-kali/share

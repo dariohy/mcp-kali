@@ -195,8 +195,27 @@ This creates a non-root, self-contained user installation:
 │       └── <plugin>/
 │           ├── plugin.yaml
 │           └── references/*.md
-└── var/jobs/                    # durable private job data
+└── var/lib/
+    ├── jobs/                    # durable private job data
+    └── archive/jobs/            # recoverable terminal-job archives
 ```
+
+### Installation directory map
+
+The same logical components use different roots for a self-contained user
+installation and a system-wide service installation.
+
+| Component | Local user installation | System-wide installation | Purpose |
+|---|---|---|---|
+| Server and bridge binaries | `~/.mcp-kali/bin/` | `/usr/local/bin/` | `mcp-kali` and `mcp-kali-bridge` executables |
+| User command symlinks | `~/.local/bin/` | — | Convenience symlinks to the local binaries |
+| Main configuration | `~/.mcp-kali/etc/mcp-kali.conf` | `/etc/mcp-kali/mcp-kali.conf` | Normal, non-secret runtime configuration |
+| Plugin overlay | `~/.mcp-kali/etc/plugins/` | `/etc/mcp-kali/plugins/` | Administrator-supplied Plugin and catalog overrides |
+| Reference overlay | `~/.mcp-kali/etc/references/` | `/etc/mcp-kali/references/` | Operator-imported Markdown reference guides |
+| Packaged data | `~/.mcp-kali/share/plugins/` | `/usr/lib/mcp-kali/plugins/` | Read-only bundled Plugins, catalog, and references |
+| Active job state | `~/.mcp-kali/var/lib/jobs/` | `/var/lib/mcp-kali/jobs/` | Private job metadata, command records, and output |
+| Job archive | `~/.mcp-kali/var/lib/archive/jobs/` | `/var/lib/mcp-kali/archive/jobs/` | Recoverable terminal-job directories |
+| Systemd unit | — | `/usr/lib/systemd/system/mcp-kali.service` | Generated service definition |
 
 Add its binary directory to `PATH` if necessary:
 
@@ -305,8 +324,8 @@ messages. The binaries already direct tracing to stderr.
 | Environment variable | CLI flag | Default | Validation |
 |---|---|---|---|
 | `MCP_KALI_BIND` | `--bind` | `127.0.0.1:5000` | Valid socket address |
-| `MCP_KALI_STATE_DIR` | `--state-dir` | `~/.mcp-kali/var/jobs` | Writable path |
-| `MCP_KALI_JOB_ARCHIVE_DIR` | `--job-archive-dir` | `~/.mcp-kali/var/archive/jobs` | Writable archive path outside the active state directory |
+| `MCP_KALI_STATE_DIR` | `--state-dir` | `~/.mcp-kali/var/lib/jobs` | Writable path |
+| `MCP_KALI_JOB_ARCHIVE_DIR` | `--job-archive-dir` | `~/.mcp-kali/var/lib/archive/jobs` | Writable archive path outside the active state directory |
 | `MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES` | `--job-archive-after-minutes` | `60` | 1–5256000 minutes |
 | `MCP_KALI_MAX_CONCURRENCY` | `--max-concurrency` | `2` | 1–256 |
 | `MCP_KALI_DEFAULT_TIMEOUT` | `--default-timeout` | `1800` | 1–604800 seconds |
@@ -316,6 +335,12 @@ messages. The binaries already direct tracing to stderr.
 | `MCP_KALI_DISABLE_EXECUTE_COMMAND` | `--disable-execute-command` | `false` | Boolean |
 | `MCP_KALI_PRIVILEGE_ELEVATION` | `--privilege-elevation` | `auto` | `auto` or `none` |
 | `MCP_KALI_ALLOW_REMOTE_BIND` | `--allow-remote-bind` | `false` | Boolean acknowledgement |
+
+Local state from earlier releases is not moved automatically. It remains at
+`~/.mcp-kali/var/jobs`; set `MCP_KALI_STATE_DIR` and
+`MCP_KALI_JOB_ARCHIVE_DIR` to the old paths to keep using it, or move the job
+and archive directories to the new `var/lib` layout while the server is
+stopped.
 
 Boolean env values use Clap's normal boolean parsing. Use `true` or `false`.
 
@@ -1524,7 +1549,7 @@ Do not place credentials, passwords, or tokens in the configuration file.
 
 ### Cannot create state directory
 
-The default `~/.mcp-kali/var/jobs` is created by `make install-local`. For an
+The default `~/.mcp-kali/var/lib/jobs` is created by `make install-local`. For an
 ad-hoc development run:
 
 ```bash

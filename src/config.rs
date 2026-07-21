@@ -90,7 +90,7 @@ pub fn default_mcp_kali_home() -> Option<PathBuf> {
 
 pub fn default_state_dir() -> PathBuf {
     default_mcp_kali_home()
-        .map(|home| home.join("var/jobs"))
+        .map(|home| home.join("var/lib/jobs"))
         .unwrap_or_else(|| PathBuf::from("/var/lib/mcp-kali/jobs"))
 }
 
