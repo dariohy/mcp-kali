@@ -87,7 +87,8 @@ target/release/mcp-kali-bridge
 ~/.mcp-kali/
 ├── bin/                         # mcp-kali and mcp-kali-bridge
 ├── etc/
-│   ├── mcp-kali.conf            # normal, non-secret user configuration
+│   ├── mcp-kali.config          # normal, non-secret ready-to-run configuration
+│   ├── mcp-kali.config.example  # reference for every available setting
 │   ├── plugins/                 # administrator Plugin/catalog overlay
 │   └── references/              # operator-imported reference overlay
 ├── share/
@@ -174,9 +175,9 @@ to `SIGHUP`. The service runs from the selected service user's home directory;
 standalone runs retain the invoking shell's working directory.
 
 When no `--config-file` or `MCP_KALI_CONFIG_FILE` is selected, MCP Kali uses
-`/etc/mcp-kali/mcp-kali.conf` if it exists. If it does not, it falls back to the
-existing per-user `~/.mcp-kali/etc/mcp-kali.conf` lookup, preserving standalone
-operation.
+`/etc/mcp-kali/mcp-kali.config` if it exists. If it does not, it falls back to
+the per-user `~/.mcp-kali/etc/mcp-kali.config` lookup. Legacy `.conf` files are
+used only when neither canonical `.config` file exists.
 
 Release builds use size optimization, full LTO, one codegen unit, stripped
 symbols, and abort-on-panic behavior. No scheduler, API, dashboard, or MCP
@@ -192,7 +193,7 @@ Start the server on loopback with a workspace-local state directory:
   --state-dir ./var/jobs \
   --system-data-dir . \
   --max-concurrency 2 \
-  --default-timeout 1800
+  --default-timeout 432000
 ```
 
 Verify health:
@@ -223,18 +224,18 @@ Configuration precedence, from lowest to highest, is:
 
 ```text
 hardcoded defaults
--> /etc/mcp-kali/mcp-kali.conf when present, otherwise ~/.mcp-kali/etc/mcp-kali.conf (or selected config file)
+-> /etc/mcp-kali/mcp-kali.config when present, otherwise ~/.mcp-kali/etc/mcp-kali.config (or selected config file)
 -> existing shell environment
 -> command-line arguments
 ```
 
-`make install-local` creates `~/.mcp-kali/etc/mcp-kali.conf` if it does not
+`make install-local` renders `~/.mcp-kali/etc/mcp-kali.config` if it does not
 already exist. The file uses a simple `KEY=VALUE` syntax and must not contain
-secrets. To create the file before installation:
+secrets. The repository template contains install-path placeholders, so use the
+installer rather than copying it directly:
 
 ```bash
-mkdir -p ~/.mcp-kali/etc
-install -m 644 examples/mcp-kali.conf.example ~/.mcp-kali/etc/mcp-kali.conf
+make install-local
 ```
 
 Select another file with `--config-file PATH` or `MCP_KALI_CONFIG_FILE`.
@@ -245,15 +246,15 @@ not accept the prior `--env-file` / `MCP_KALI_ENV_FILE` selectors.
 | Variable | Binary | Default | Description |
 |---|---|---:|---|
 | `MCP_KALI_HOME` | Both | `~/.mcp-kali` | Root of the self-contained per-user tree |
-| `MCP_KALI_CONFIG_FILE` | Both | `/etc/mcp-kali/mcp-kali.conf` when present, otherwise `~/.mcp-kali/etc/mcp-kali.conf` | Alternate configuration-file path |
+| `MCP_KALI_CONFIG_FILE` | Both | `/etc/mcp-kali/mcp-kali.config` when present, otherwise `~/.mcp-kali/etc/mcp-kali.config` | Alternate configuration-file path |
 | `RUST_LOG` | Both | Binary-specific info filter | Tracing filter; server output follows `MCP_KALI_LOG_DIR`, while bridge diagnostics stay on stderr |
 | `MCP_KALI_BIND` | Server | `127.0.0.1:5000` | HTTP API/dashboard bind address |
 | `MCP_KALI_STATE_DIR` | Server | `~/.mcp-kali/var/lib/jobs` | Private durable job directory |
 | `MCP_KALI_LOG_DIR` | Server | Installed configuration sets a user or system log directory; otherwise unset | Existing writable directory for split JSONL logs; absent or unusable falls back to stdout |
 | `MCP_KALI_JOB_ARCHIVE_DIR` | Server | `~/.mcp-kali/var/lib/archive/jobs` | Private recoverable archive for terminal jobs |
 | `MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES` | Server | `60` | Minimum terminal-job age used by `SIGUSR1`, range 1–5256000 minutes |
-| `MCP_KALI_MAX_CONCURRENCY` | Server | `2` | Simultaneous jobs, range 1–256 |
-| `MCP_KALI_DEFAULT_TIMEOUT` | Server | `1800` | Default wall timeout, range 1–604800 seconds |
+| `MCP_KALI_MAX_CONCURRENCY` | Server | `4` | Simultaneous jobs, range 1–256 |
+| `MCP_KALI_DEFAULT_TIMEOUT` | Server | `432000` (five days) | Default wall timeout, range 1–604800 seconds (seven days) |
 | `MCP_KALI_REVEAL_SENSITIVE_DATA` | Server | `false` | Show unredacted commands in public records |
 | `MCP_KALI_SYSTEM_DATA_DIR` | Server | `~/.mcp-kali/share` | Packaged Plugin, catalog, and reference data |
 | `MCP_KALI_CONFIG_DIR` | Server | `~/.mcp-kali/etc` | Administrator Plugin, catalog, and reference overlays |
@@ -599,7 +600,8 @@ development builds.
 - [Support guide](SUPPORT.md)
 - [Code of conduct](CODE_OF_CONDUCT.md)
 - [Publishing and release guide](docs/PUBLISHING.md)
-- [Example configuration file](examples/mcp-kali.conf.example)
+- [Default configuration template](examples/mcp-kali.config)
+- [Configuration reference](examples/mcp-kali.config.example)
 
 ## License and upstream attribution
 

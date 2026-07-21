@@ -7,7 +7,8 @@ use std::{
 
 const CONFIG_FILE_VARIABLE: &str = "MCP_KALI_CONFIG_FILE";
 const HOME_VARIABLE: &str = "MCP_KALI_HOME";
-const SYSTEM_CONFIG_FILE: &str = "/etc/mcp-kali/mcp-kali.conf";
+const SYSTEM_CONFIG_FILE: &str = "/etc/mcp-kali/mcp-kali.config";
+const LEGACY_SYSTEM_CONFIG_FILE: &str = "/etc/mcp-kali/mcp-kali.conf";
 
 /// Loads the shared MCP Kali configuration file before Clap resolves
 /// environment-backed options. The file uses a simple `KEY=VALUE` format so
@@ -109,8 +110,14 @@ pub fn default_config_dir() -> PathBuf {
 fn default_config_file() -> Option<PathBuf> {
     preferred_config_file(
         PathBuf::from(SYSTEM_CONFIG_FILE),
-        default_mcp_kali_home().map(|home| home.join("etc/mcp-kali.conf")),
+        default_mcp_kali_home().map(|home| home.join("etc/mcp-kali.config")),
     )
+    .or_else(|| {
+        preferred_config_file(
+            PathBuf::from(LEGACY_SYSTEM_CONFIG_FILE),
+            default_mcp_kali_home().map(|home| home.join("etc/mcp-kali.conf")),
+        )
+    })
 }
 
 fn preferred_config_file(system: PathBuf, user: Option<PathBuf>) -> Option<PathBuf> {
@@ -175,6 +182,19 @@ mod tests {
         assert_eq!(
             preferred_config_file(system, Some(user.clone())),
             Some(user)
+        );
+    }
+
+    #[test]
+    fn canonical_config_is_preferred_over_legacy_config() {
+        let directory = tempfile::tempdir().unwrap();
+        let canonical = directory.path().join("mcp-kali.config");
+        let legacy = directory.path().join("mcp-kali.conf");
+        std::fs::write(&canonical, "KEY=CANONICAL\n").unwrap();
+        std::fs::write(&legacy, "KEY=LEGACY\n").unwrap();
+        assert_eq!(
+            preferred_config_file(canonical.clone(), Some(legacy)),
+            Some(canonical)
         );
     }
 }

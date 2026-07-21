@@ -194,7 +194,7 @@ with their environment.
 
 ## Configuration model
 
-Both binaries load `~/.mcp-kali/etc/mcp-kali.conf` before Clap parsing.
+Both binaries load `~/.mcp-kali/etc/mcp-kali.config` before Clap parsing.
 `MCP_KALI_HOME` relocates the complete per-user tree; an explicit
 `--config-file` or `MCP_KALI_CONFIG_FILE` selects another file. The `KEY=VALUE`
 configuration file is non-secret: credentials, passwords, and tokens do not

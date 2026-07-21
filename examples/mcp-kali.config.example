@@ -1,0 +1,69 @@
+# MCP Kali configuration reference
+#
+# This file documents every supported configuration setting. The installer puts
+# it beside the active mcp-kali.config. It is non-secret: never put passwords,
+# tokens, credentials, command arguments, request bodies, webhook URLs, or job
+# output in either file.
+#
+# Precedence (low to high): built-in defaults, selected mcp-kali.config,
+# pre-existing shell environment, then command-line flags. MCP_KALI_LOG_DIR has
+# no CLI flag. The legacy mcp-kali.conf name is accepted only as a migration
+# fallback when neither canonical mcp-kali.config path exists.
+
+# RUST_LOG controls normal tracing verbosity for server and bridge:
+#   error < warn < info < debug < trace
+# Default: mcp_kali=info,tower_http=info. Use comma-separated target filters,
+# for example mcp_kali=debug,tower_http=info. It filters server JSONL output,
+# server stdout fallback, and bridge stderr diagnostics. Debug and trace never
+# relax the privacy policy above.
+RUST_LOG=mcp_kali=info,tower_http=info
+
+# Server bind address. A non-loopback address also requires
+# MCP_KALI_ALLOW_REMOTE_BIND=true.
+MCP_KALI_BIND=127.0.0.1:5000
+
+# Optional root for a self-contained user installation.
+# MCP_KALI_HOME=~/.mcp-kali
+# Private durable job state directory.
+# MCP_KALI_STATE_DIR=~/.mcp-kali/var/lib/jobs
+
+# Structured server logging. The directory must already exist, be writable,
+# and not be a symlink. TRACE/DEBUG/INFO go exclusively to mcp-kali.jsonl;
+# WARN/ERROR go exclusively to mcp-kali.error.jsonl. Both files are 0600 below
+# a 0700 installed directory. If the directory or either file is unavailable,
+# all server tracing falls back to human-readable stdout. The bridge always
+# writes diagnostics to stderr because stdout is reserved for MCP protocol.
+# SIGHUP flushes and reopens both fixed filenames, then reloads supported
+# runtime settings. A directory change requires a restart.
+# MCP_KALI_LOG_DIR=~/.mcp-kali/var/log/mcp-kali
+
+# Recoverable terminal-job archive and SIGUSR1 age threshold (1–5256000 min).
+# MCP_KALI_JOB_ARCHIVE_DIR=~/.mcp-kali/var/lib/archive/jobs
+MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES=60
+
+# Read-only packaged data and administrator-managed overlays.
+# MCP_KALI_SYSTEM_DATA_DIR=~/.mcp-kali/share
+# MCP_KALI_CONFIG_DIR=~/.mcp-kali/etc
+
+# Scheduler: valid concurrency is 1–256. The five-day default timeout is
+# 432000 seconds; valid timeouts are 1–604800 seconds (seven days). Queued,
+# paused, and running time all count toward the timeout.
+MCP_KALI_MAX_CONCURRENCY=4
+MCP_KALI_DEFAULT_TIMEOUT=432000
+
+# Show unredacted command values in public records (normally false).
+MCP_KALI_REVEAL_SENSITIVE_DATA=false
+# auto uses sudo -n for declarative root-required tools unless already root;
+# none runs them directly without adding sudo.
+MCP_KALI_PRIVILEGE_ELEVATION=auto
+# Disable the privileged free-execution tool.
+MCP_KALI_DISABLE_EXECUTE_COMMAND=false
+# Acknowledge an unauthenticated non-loopback bind.
+MCP_KALI_ALLOW_REMOTE_BIND=false
+
+# Bridge server URL and non-loopback HTTP acknowledgement.
+MCP_KALI_SERVER=http://127.0.0.1:5000
+MCP_KALI_ALLOW_INSECURE_HTTP=false
+
+# Optional explicit configuration path for either binary.
+# MCP_KALI_CONFIG_FILE=/path/to/mcp-kali.config

@@ -186,7 +186,8 @@ This creates a non-root, self-contained user installation:
 ~/.mcp-kali/
 ├── bin/                         # executable binaries
 ├── etc/
-│   ├── mcp-kali.conf            # normal, non-secret configuration
+│   ├── mcp-kali.config          # normal, non-secret ready-to-run configuration
+│   ├── mcp-kali.config.example  # reference for every available setting
 │   ├── plugins/                 # administrator Plugin/catalog overlay
 │   └── references/              # operator reference overlay
 ├── share/
@@ -211,7 +212,8 @@ installation and a system-wide service installation.
 |---|---|---|---|
 | Server and bridge binaries | `~/.mcp-kali/bin/` | `/usr/local/bin/` | `mcp-kali` and `mcp-kali-bridge` executables |
 | User command symlinks | `~/.local/bin/` | — | Convenience symlinks to the local binaries |
-| Main configuration | `~/.mcp-kali/etc/mcp-kali.conf` | `/etc/mcp-kali/mcp-kali.conf` | Normal, non-secret runtime configuration |
+| Main configuration | `~/.mcp-kali/etc/mcp-kali.config` | `/etc/mcp-kali/mcp-kali.config` | Normal, non-secret ready-to-run configuration |
+| Configuration reference | `~/.mcp-kali/etc/mcp-kali.config.example` | `/etc/mcp-kali/mcp-kali.config.example` | All settings, defaults, limits, and logging policy |
 | Plugin overlay | `~/.mcp-kali/etc/plugins/` | `/etc/mcp-kali/plugins/` | Administrator-supplied Plugin and catalog overrides |
 | Reference overlay | `~/.mcp-kali/etc/references/` | `/etc/mcp-kali/references/` | Operator-imported Markdown reference guides |
 | Packaged data | `~/.mcp-kali/share/plugins/` | `/usr/lib/mcp-kali/plugins/` | Read-only bundled Plugins, catalog, and references |
@@ -279,19 +281,19 @@ hardcoded default
 The default configuration file is:
 
 ```text
-~/.mcp-kali/etc/mcp-kali.conf
+~/.mcp-kali/etc/mcp-kali.config
 ```
 
 Choose another path with either:
 
 ```bash
-mcp-kali --config-file /path/to/mcp-kali.conf
+mcp-kali --config-file /path/to/mcp-kali.config
 ```
 
 or:
 
 ```bash
-export MCP_KALI_CONFIG_FILE=/path/to/mcp-kali.conf
+export MCP_KALI_CONFIG_FILE=/path/to/mcp-kali.config
 ```
 
 An explicitly selected missing file is an error. A missing default file is
@@ -302,16 +304,19 @@ passwords, or tokens in it.
 ### Create the configuration file
 
 ```bash
-mkdir -p ~/.mcp-kali/etc
-install -m 644 examples/mcp-kali.conf.example ~/.mcp-kali/etc/mcp-kali.conf
+make install-local
 ```
+
+The installer renders the path placeholders in `examples/mcp-kali.config` for
+the chosen user or system installation; do not copy that source template
+directly. The installed `mcp-kali.config` is ready to launch.
 
 ### Shared variables
 
 | Variable | Required | Default | Meaning |
 |---|---:|---|---|
 | `MCP_KALI_HOME` | No | `~/.mcp-kali` | Root of the self-contained per-user tree |
-| `MCP_KALI_CONFIG_FILE` | No | `/etc/mcp-kali/mcp-kali.conf` when present, otherwise `~/.mcp-kali/etc/mcp-kali.conf` | Alternate configuration-file path |
+| `MCP_KALI_CONFIG_FILE` | No | `/etc/mcp-kali/mcp-kali.config` when present, otherwise `~/.mcp-kali/etc/mcp-kali.config` | Alternate configuration-file path |
 | `RUST_LOG` | No | `mcp_kali=info` plus server HTTP info | Tracing filter; server destination is selected below, bridge diagnostics use stderr |
 
 Examples:
@@ -333,8 +338,8 @@ messages. The bridge always directs tracing to stderr.
 | `MCP_KALI_LOG_DIR` | — | Installed configuration sets a user or system directory; otherwise unset | Existing writable non-symlink directory; unusable or absent falls back to stdout |
 | `MCP_KALI_JOB_ARCHIVE_DIR` | `--job-archive-dir` | `~/.mcp-kali/var/lib/archive/jobs` | Writable archive path outside the active state directory |
 | `MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES` | `--job-archive-after-minutes` | `60` | 1–5256000 minutes |
-| `MCP_KALI_MAX_CONCURRENCY` | `--max-concurrency` | `2` | 1–256 |
-| `MCP_KALI_DEFAULT_TIMEOUT` | `--default-timeout` | `1800` | 1–604800 seconds |
+| `MCP_KALI_MAX_CONCURRENCY` | `--max-concurrency` | `4` | 1–256 |
+| `MCP_KALI_DEFAULT_TIMEOUT` | `--default-timeout` | `432000` (five days) | 1–604800 seconds (maximum seven days) |
 | `MCP_KALI_REVEAL_SENSITIVE_DATA` | `--reveal-sensitive-data` | `false` | Boolean |
 | `MCP_KALI_SYSTEM_DATA_DIR` | `--system-data-dir` | `~/.mcp-kali/share` | Directory |
 | `MCP_KALI_CONFIG_DIR` | `--config-dir` | `~/.mcp-kali/etc` | Directory |
@@ -412,7 +417,7 @@ mcp-kali \
   --bind 127.0.0.1:5000 \
   --state-dir ./var/jobs \
   --max-concurrency 2 \
-  --default-timeout 1800
+  --default-timeout 432000
 ```
 
 ### Systemd installation
@@ -454,9 +459,9 @@ account's home directory; outside systemd, mcp-kali leaves the invoking
 process's working directory unchanged.
 
 Without an explicit `--config-file` or `MCP_KALI_CONFIG_FILE`, the binaries use
-`/etc/mcp-kali/mcp-kali.conf` when it exists; otherwise they retain the normal
-per-user `~/.mcp-kali/etc/mcp-kali.conf` fallback. This makes the same binary
-suitable for both service and standalone use.
+`/etc/mcp-kali/mcp-kali.config` when it exists; otherwise they use the normal
+per-user `~/.mcp-kali/etc/mcp-kali.config` fallback. Legacy `.conf` paths are
+consulted only when neither canonical file exists.
 
 ### Runtime signals
 
@@ -551,7 +556,7 @@ That override is intended only for isolated labs.
 }
 ```
 
-If settings live in `~/.mcp-kali/etc/mcp-kali.conf`, the `args` array can be
+If settings live in `~/.mcp-kali/etc/mcp-kali.config`, the `args` array can be
 empty.
 
 The MCP host launches the bridge locally, so `command` must be an absolute path
@@ -1585,7 +1590,7 @@ longer a built-in adapter; authorized operators may use the privileged
 argv-only Core tool until a dedicated reviewed Plugin contract exists.
 
 Version 2.0.0 also removes the legacy configuration path and selectors. Create
-`~/.mcp-kali/etc/mcp-kali.conf` and use `--config-file` or
+`~/.mcp-kali/etc/mcp-kali.config` and use `--config-file` or
 `MCP_KALI_CONFIG_FILE`; `mcp-kali.env`, `~/.envs/.env_mcp-kali`, `--env-file`,
 and `MCP_KALI_ENV_FILE` are not recognized.
 

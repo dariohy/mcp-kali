@@ -15,8 +15,10 @@ fn system_templates_define_private_split_logs_and_rotation() {
 
 #[test]
 fn installed_configuration_templates_declare_log_directories() {
-    let user = include_str!("../examples/mcp-kali.conf.example");
-    let system = include_str!("../examples/mcp-kali.system.conf.example");
-    assert!(user.contains("# MCP_KALI_LOG_DIR=/home/your-user/.mcp-kali/var/log/mcp-kali"));
-    assert!(system.contains("MCP_KALI_LOG_DIR=/var/log/mcp-kali"));
+    let default_config = include_str!("../examples/mcp-kali.config");
+    let reference = include_str!("../examples/mcp-kali.config.example");
+    assert!(default_config.contains("MCP_KALI_LOG_DIR=@MCP_KALI_LOG_DIR@"));
+    assert!(reference.contains("MCP_KALI_MAX_CONCURRENCY=4"));
+    assert!(reference.contains("MCP_KALI_DEFAULT_TIMEOUT=432000"));
+    assert!(reference.contains("RUST_LOG controls normal tracing verbosity"));
 }

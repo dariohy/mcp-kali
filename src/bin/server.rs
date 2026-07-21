@@ -44,11 +44,11 @@ struct Cli {
     job_archive_after_minutes: u64,
 
     /// Maximum scanner processes running at once.
-    #[arg(long, env = "MCP_KALI_MAX_CONCURRENCY", default_value_t = 2)]
+    #[arg(long, env = "MCP_KALI_MAX_CONCURRENCY", default_value_t = 4)]
     max_concurrency: usize,
 
     /// Default per-job wall-clock timeout in seconds.
-    #[arg(long, env = "MCP_KALI_DEFAULT_TIMEOUT", default_value_t = 1800)]
+    #[arg(long, env = "MCP_KALI_DEFAULT_TIMEOUT", default_value_t = 432_000)]
     default_timeout: u64,
 
     /// Show otherwise-redacted passwords and sensitive arguments in the job API,

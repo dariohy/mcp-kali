@@ -37,7 +37,7 @@ fn splits_json_logs_and_reopens_both_files_after_sighup() {
     fs::create_dir(&log_dir).unwrap();
     fs::create_dir(&system_data).unwrap();
     fs::create_dir(&config_dir).unwrap();
-    let config_file = root.path().join("mcp-kali.conf");
+    let config_file = root.path().join("mcp-kali.config");
     fs::write(
         &config_file,
         format!(
@@ -131,7 +131,7 @@ fn splits_json_logs_and_reopens_both_files_after_sighup() {
 #[test]
 fn unavailable_configured_directory_falls_back_to_stdout() {
     let root = tempfile::tempdir().unwrap();
-    let config_file = root.path().join("mcp-kali.conf");
+    let config_file = root.path().join("mcp-kali.config");
     fs::write(
         &config_file,
         format!(
