@@ -97,7 +97,7 @@ target/release/mcp-kali-bridge
 │           └── references/*.md
 └── var/lib/
     ├── jobs/                    # private durable job state and output
-    └── archive/jobs/            # recoverable terminal-job archives
+    └── archive/jobs/            # timestamp-windowed .tar.gz terminal-job archives
 ```
 
 If the MCP host needs only the bridge, use the smaller local installation:
@@ -418,13 +418,17 @@ STATE_DIR/<job-uuid>/job.json
 STATE_DIR/<job-uuid>/command.json
 STATE_DIR/<job-uuid>/stdout.log
 STATE_DIR/<job-uuid>/stderr.log
+STATE_DIR/<job-uuid>/integrity.json
 ```
 
-Archiving atomically moves the complete directory out of the active index and
-into `JOB_ARCHIVE_DIR/<job-uuid>/`. Archived jobs disappear from the API and
-dashboard but retain their metadata, private execution specification, and
-output. MCP Kali does not automatically delete archived evidence; retention is
-an administrator policy.
+Every terminal job receives a private `integrity.json` manifest containing
+SHA-256 hashes and byte counts for its final metadata, execution specification,
+and output files. Archiving verifies that manifest, then writes a timestamped
+`jobs_<oldest-start>_to_<newest-finish>_<count>.tar.gz` file under
+`JOB_ARCHIVE_DIR`. Archived jobs disappear from the API and dashboard but retain
+their metadata, private execution specification, output, and integrity manifest.
+MCP Kali does not automatically delete archived evidence; retention is an
+administrator policy.
 
 On Unix, job directories use mode `700`; files use mode `600`. These artifacts
 may contain sensitive pentest evidence and must be protected and retained or

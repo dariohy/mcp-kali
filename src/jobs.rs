@@ -3,9 +3,12 @@ use crate::models::{
 };
 use anyhow::{Context, Result, anyhow, bail};
 use chrono::Utc;
+use flate2::{Compression, write::GzEncoder};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
+    fs as stdfs,
     path::{Path, PathBuf},
     sync::{
         Arc,
@@ -35,6 +38,24 @@ const MAX_TOOL_BYTES: usize = 128;
 const MAX_ARCHIVE_MINUTES: u64 = 10 * 365 * 24 * 60;
 const JOB_TERMINATION_GRACE: Duration = Duration::from_secs(5);
 const SHUTDOWN_TERMINATION_GRACE: Duration = Duration::from_secs(10);
+const INTEGRITY_FILE: &str = "integrity.json";
+const INTEGRITY_ALGORITHM: &str = "sha256";
+
+#[derive(Serialize, Deserialize)]
+struct JobIntegrityManifest {
+    version: u8,
+    algorithm: String,
+    generated_at: chrono::DateTime<Utc>,
+    job_id: Uuid,
+    files: Vec<JobIntegrityFile>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct JobIntegrityFile {
+    path: String,
+    bytes: u64,
+    sha256: String,
+}
 
 pub fn default_archive_root(job_root: &Path) -> PathBuf {
     job_root
@@ -205,8 +226,8 @@ impl Scheduler {
         let cutoff = archive_cutoff(older_than_minutes)?;
         let candidates = self.archive_candidates(cutoff).await;
         let mut bytes = 0u64;
-        for id in &candidates {
-            bytes = bytes.saturating_add(job_directory_size(&self.job_dir(*id)).await?);
+        for job in &candidates {
+            bytes = bytes.saturating_add(job_directory_size(&self.job_dir(job.id)).await?);
         }
         Ok(JobArchivePreview {
             older_than_minutes,
@@ -232,40 +253,77 @@ impl Scheduler {
         let cutoff = archive_cutoff(older_than_minutes)?;
         let candidates = self.archive_candidates(cutoff).await;
         let matched = candidates.len();
-        let mut archived = 0usize;
+        let mut archive_jobs = Vec::new();
         let mut bytes_archived = 0u64;
         let mut failures = Vec::new();
 
-        for id in candidates {
-            let source = self.job_dir(id);
-            let destination = self.inner.archive_root.join(id.to_string());
+        for job in candidates {
+            let source = self.job_dir(job.id);
+            if let Err(error) = ensure_integrity_manifest(&self.inner.root, &job).await {
+                failures.push(JobArchiveFailure {
+                    job_id: job.id,
+                    error: format!("terminal job integrity verification failed: {error}"),
+                });
+                continue;
+            }
             let bytes = match job_directory_size(&source).await {
                 Ok(bytes) => bytes,
                 Err(error) => {
                     failures.push(JobArchiveFailure {
-                        job_id: id,
+                        job_id: job.id,
                         error: error.to_string(),
                     });
                     continue;
                 }
             };
-            if fs::try_exists(&destination).await? {
-                failures.push(JobArchiveFailure {
-                    job_id: id,
-                    error: "archive destination already exists".into(),
-                });
-                continue;
-            }
-            match fs::rename(&source, &destination).await {
-                Ok(()) => {
-                    self.inner.jobs.lock().await.remove(&id);
-                    archived += 1;
-                    bytes_archived = bytes_archived.saturating_add(bytes);
+            bytes_archived = bytes_archived.saturating_add(bytes);
+            archive_jobs.push(job);
+        }
+
+        let mut archive_file = None;
+        if !archive_jobs.is_empty() {
+            let destination = self.archive_destination(&archive_jobs).await?;
+            let sources = archive_jobs
+                .iter()
+                .map(|job| (job.id, self.job_dir(job.id)))
+                .collect::<Vec<_>>();
+            let create_result = tokio::task::spawn_blocking({
+                let destination = destination.clone();
+                move || create_gzip_archive(&destination, &sources)
+            })
+            .await
+            .context("archive compression task panicked")?;
+            if let Err(error) = create_result {
+                for job in &archive_jobs {
+                    failures.push(JobArchiveFailure {
+                        job_id: job.id,
+                        error: format!("could not create compressed archive: {error}"),
+                    });
                 }
-                Err(error) => failures.push(JobArchiveFailure {
-                    job_id: id,
-                    error: error.to_string(),
-                }),
+                bytes_archived = 0;
+            } else {
+                archive_file = destination
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .map(str::to_owned);
+            }
+        }
+
+        let mut archived = 0usize;
+        if archive_file.is_some() {
+            for job in archive_jobs {
+                match fs::remove_dir_all(self.job_dir(job.id)).await {
+                    Ok(()) => {
+                        self.inner.jobs.lock().await.remove(&job.id);
+                        archived += 1;
+                    }
+                    Err(error) => failures.push(JobArchiveFailure {
+                        job_id: job.id,
+                        error: format!(
+                            "compressed archive was created but the active job directory could not be removed: {error}"
+                        ),
+                    }),
+                }
             }
         }
 
@@ -284,11 +342,42 @@ impl Scheduler {
             archived,
             failed: failures.len(),
             bytes_archived,
+            archive_file,
             failures,
         })
     }
 
-    async fn archive_candidates(&self, cutoff: chrono::DateTime<Utc>) -> Vec<Uuid> {
+    async fn archive_destination(&self, jobs: &[Job]) -> Result<PathBuf> {
+        let oldest_started = jobs
+            .iter()
+            .map(|job| job.started_at.unwrap_or(job.created_at))
+            .min()
+            .context("archive requires at least one job")?;
+        let newest_finished = jobs
+            .iter()
+            .filter_map(|job| job.finished_at)
+            .max()
+            .context("terminal jobs must have a finished timestamp")?;
+        let base = format!(
+            "jobs_{}_to_{}_{}.tar.gz",
+            oldest_started.format("%Y%m%dT%H%M%SZ"),
+            newest_finished.format("%Y%m%dT%H%M%SZ"),
+            jobs.len()
+        );
+        let destination = self.inner.archive_root.join(&base);
+        if !fs::try_exists(&destination).await? {
+            return Ok(destination);
+        }
+        Ok(self.inner.archive_root.join(format!(
+            "jobs_{}_to_{}_{}_{}.tar.gz",
+            oldest_started.format("%Y%m%dT%H%M%SZ"),
+            newest_finished.format("%Y%m%dT%H%M%SZ"),
+            jobs.len(),
+            Uuid::new_v4()
+        )))
+    }
+
+    async fn archive_candidates(&self, cutoff: chrono::DateTime<Utc>) -> Vec<Job> {
         self.inner
             .jobs
             .lock()
@@ -298,7 +387,7 @@ impl Scheduler {
                 job.state.is_terminal()
                     && job.finished_at.is_some_and(|finished| finished <= cutoff)
             })
-            .map(|job| job.id)
+            .cloned()
             .collect()
     }
 
@@ -348,7 +437,17 @@ impl Scheduler {
                 changed = true;
             }
             if changed {
-                persist_at(&self.inner.root, &job).await?;
+                if job.state.is_terminal() {
+                    persist_terminal_at(&self.inner.root, &job).await?;
+                } else {
+                    persist_at(&self.inner.root, &job).await?;
+                }
+            } else if job.state.is_terminal()
+                && !fs::try_exists(entry.path().join(INTEGRITY_FILE)).await?
+            {
+                // Upgrade pre-integrity terminal records without rewriting a
+                // manifest that already exists and may signal tampering.
+                write_integrity_manifest(&self.inner.root, &job).await?;
             }
             jobs.insert(job.id, job);
         }
@@ -480,7 +579,7 @@ impl Scheduler {
                         job.state = JobState::Cancelled;
                         job.finished_at = Some(Utc::now());
                         job.error = Some("server shutting down".into());
-                        if let Err(error) = persist_at(&self.inner.root, job).await {
+                        if let Err(error) = persist_terminal_at(&self.inner.root, job).await {
                             error!(id = %job.id, %error, "could not persist cancelled job during shutdown");
                         }
                     }
@@ -547,7 +646,7 @@ impl Scheduler {
                 let job = jobs.get_mut(&id).ok_or_else(|| anyhow!("job not found"))?;
                 job.state = JobState::Cancelled;
                 job.finished_at = Some(Utc::now());
-                persist_at(&self.inner.root, job).await?;
+                persist_terminal_at(&self.inner.root, job).await?;
             }
             JobState::Running | JobState::Paused => self
                 .inner
@@ -861,7 +960,7 @@ impl Scheduler {
             job.return_code = outcome.1;
             job.error = outcome.2;
             job.finished_at = Some(Utc::now());
-            persist_at(&self.inner.root, job).await?;
+            persist_terminal_at(&self.inner.root, job).await?;
             job.clone()
         };
         info!(%id, state = ?completed.state, "job finished");
@@ -973,6 +1072,147 @@ fn shell_quote(value: &str) -> String {
     } else {
         format!("'{}'", value.replace('\'', "'\\''"))
     }
+}
+
+async fn persist_terminal_at(root: &Path, job: &Job) -> Result<()> {
+    persist_at(root, job).await?;
+    write_integrity_manifest(root, job).await
+}
+
+async fn write_integrity_manifest(root: &Path, job: &Job) -> Result<()> {
+    let dir = root.join(job.id.to_string());
+    let mut files = Vec::new();
+    for name in ["job.json", "command.json", "stdout.log", "stderr.log"] {
+        let path = dir.join(name);
+        if !fs::try_exists(&path).await? {
+            continue;
+        }
+        let (bytes, sha256) = sha256_file(&path).await?;
+        files.push(JobIntegrityFile {
+            path: name.into(),
+            bytes,
+            sha256,
+        });
+    }
+    if !files.iter().any(|file| file.path == "job.json")
+        || !files.iter().any(|file| file.path == "command.json")
+    {
+        bail!("terminal job {} is missing required evidence files", job.id);
+    }
+    let manifest = JobIntegrityManifest {
+        version: 1,
+        algorithm: INTEGRITY_ALGORITHM.into(),
+        generated_at: Utc::now(),
+        job_id: job.id,
+        files,
+    };
+    write_private(
+        &dir.join(INTEGRITY_FILE),
+        &serde_json::to_vec_pretty(&manifest)?,
+    )
+    .await
+}
+
+async fn ensure_integrity_manifest(root: &Path, job: &Job) -> Result<()> {
+    let path = root.join(job.id.to_string()).join(INTEGRITY_FILE);
+    if !fs::try_exists(&path).await? {
+        // Compatibility for terminal jobs created before integrity manifests.
+        write_integrity_manifest(root, job).await?;
+    }
+    let bytes = fs::read(&path).await?;
+    let manifest = serde_json::from_slice::<JobIntegrityManifest>(&bytes)
+        .context("read integrity manifest")?;
+    if manifest.version != 1
+        || manifest.algorithm != INTEGRITY_ALGORITHM
+        || manifest.job_id != job.id
+    {
+        bail!("integrity manifest metadata is invalid");
+    }
+    if manifest.files.is_empty() {
+        bail!("integrity manifest contains no evidence files");
+    }
+    let dir = root.join(job.id.to_string());
+    let mut seen = std::collections::HashSet::new();
+    for file in manifest.files {
+        if !matches!(
+            file.path.as_str(),
+            "job.json" | "command.json" | "stdout.log" | "stderr.log"
+        ) || !seen.insert(file.path.clone())
+        {
+            bail!("integrity manifest contains an invalid file entry");
+        }
+        let (bytes, sha256) = sha256_file(&dir.join(&file.path)).await?;
+        if bytes != file.bytes || sha256 != file.sha256 {
+            bail!("checksum mismatch for {}", file.path);
+        }
+    }
+    if !seen.contains("job.json") || !seen.contains("command.json") {
+        bail!("integrity manifest omits required evidence files");
+    }
+    Ok(())
+}
+
+async fn sha256_file(path: &Path) -> Result<(u64, String)> {
+    let mut file = fs::File::open(path)
+        .await
+        .with_context(|| format!("open {} for hashing", path.display()))?;
+    let mut hasher = Sha256::new();
+    let mut bytes = 0u64;
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer).await?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+        bytes = bytes.saturating_add(read as u64);
+    }
+    Ok((bytes, format!("{:x}", hasher.finalize())))
+}
+
+fn create_gzip_archive(destination: &Path, sources: &[(Uuid, PathBuf)]) -> Result<()> {
+    let file_name = destination
+        .file_name()
+        .and_then(|name| name.to_str())
+        .context("archive destination must have a UTF-8 filename")?;
+    let temporary = destination.with_file_name(format!(".{file_name}.{}.tmp", Uuid::new_v4()));
+    let result = (|| -> Result<()> {
+        let mut options = stdfs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        options.mode(0o600);
+        let output = options.open(&temporary)?;
+        let encoder = GzEncoder::new(output, Compression::default());
+        let mut archive = tar::Builder::new(encoder);
+        for (id, source) in sources {
+            archive.append_dir(id.to_string(), source)?;
+            let mut entries =
+                stdfs::read_dir(source)?.collect::<std::result::Result<Vec<_>, _>>()?;
+            entries.sort_by_key(|entry| entry.file_name());
+            for entry in entries {
+                let file_type = entry.file_type()?;
+                if !file_type.is_file() {
+                    bail!(
+                        "refusing non-regular archive entry {}",
+                        entry.path().display()
+                    );
+                }
+                let name = entry
+                    .file_name()
+                    .into_string()
+                    .map_err(|_| anyhow!("archive entry name is not UTF-8"))?;
+                archive.append_path_with_name(entry.path(), format!("{id}/{name}"))?;
+            }
+        }
+        let output = archive.into_inner()?.finish()?;
+        output.sync_all()?;
+        stdfs::rename(&temporary, destination)?;
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = stdfs::remove_file(&temporary);
+    }
+    result
 }
 
 async fn persist_at(root: &Path, job: &Job) -> Result<()> {
@@ -1103,7 +1343,7 @@ mod tests {
             let mut jobs = scheduler.inner.jobs.lock().await;
             let job = jobs.get_mut(&terminal.id).unwrap();
             job.finished_at = Some(Utc::now() - chrono::Duration::minutes(2));
-            persist_at(&job_root, job).await.unwrap();
+            persist_terminal_at(&job_root, job).await.unwrap();
         }
 
         let active = scheduler
@@ -1133,14 +1373,76 @@ mod tests {
         assert!(scheduler.get(terminal.id).await.is_none());
         assert!(scheduler.get(active.id).await.is_some());
         assert!(!job_root.join(terminal.id.to_string()).exists());
-        let archived = archive_root.join(terminal.id.to_string());
-        assert!(archived.join("job.json").is_file());
-        assert!(archived.join("command.json").is_file());
-        assert!(archived.join("stdout.log").is_file());
-        assert!(archived.join("stderr.log").is_file());
+        let archive_name = result.archive_file.as_ref().unwrap();
+        assert!(archive_name.starts_with("jobs_"));
+        assert!(archive_name.ends_with(".tar.gz"));
+        let archive_path = archive_root.join(archive_name);
+        assert!(archive_path.is_file());
+        let archive_file = std::fs::File::open(archive_path).unwrap();
+        let decoder = flate2::read::GzDecoder::new(archive_file);
+        let mut archive = tar::Archive::new(decoder);
+        let paths = archive
+            .entries()
+            .unwrap()
+            .map(|entry| entry.unwrap().path().unwrap().into_owned())
+            .collect::<Vec<_>>();
+        let prefix = terminal.id.to_string();
+        for name in [
+            "job.json",
+            "command.json",
+            "stdout.log",
+            "stderr.log",
+            INTEGRITY_FILE,
+        ] {
+            assert!(paths.contains(&PathBuf::from(format!("{prefix}/{name}"))));
+        }
         assert!(scheduler.preview_archive(0).await.is_err());
 
         scheduler.cancel(active.id).await.unwrap();
+        scheduler.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn archive_refuses_a_terminal_job_with_modified_evidence() {
+        let temp = tempfile::tempdir().unwrap();
+        let job_root = temp.path().join("jobs");
+        let archive_root = temp.path().join("archive/jobs");
+        let scheduler =
+            Scheduler::open_with_archive(job_root.clone(), archive_root, 1, 10, 60, false)
+                .await
+                .unwrap();
+        let job = scheduler
+            .submit(SubmitJob {
+                tool: None,
+                argv: vec!["printf".into(), "original".into()],
+                timeout_seconds: None,
+                webhook_url: None,
+            })
+            .await
+            .unwrap();
+        for _ in 0..100 {
+            if scheduler.get(job.id).await.unwrap().state.is_terminal() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        {
+            let mut jobs = scheduler.inner.jobs.lock().await;
+            let terminal = jobs.get_mut(&job.id).unwrap();
+            terminal.finished_at = Some(Utc::now() - chrono::Duration::minutes(2));
+            persist_terminal_at(&job_root, terminal).await.unwrap();
+        }
+        fs::write(scheduler.job_dir(job.id).join("stdout.log"), b"modified")
+            .await
+            .unwrap();
+
+        let result = scheduler.archive_terminal_jobs(1).await.unwrap();
+        assert_eq!(result.matched, 1);
+        assert_eq!(result.archived, 0);
+        assert_eq!(result.failed, 1);
+        assert!(result.archive_file.is_none());
+        assert!(scheduler.get(job.id).await.is_some());
+
         scheduler.shutdown().await;
     }
 

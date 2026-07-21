@@ -214,7 +214,7 @@ installation and a system-wide service installation.
 | Reference overlay | `~/.mcp-kali/etc/references/` | `/etc/mcp-kali/references/` | Operator-imported Markdown reference guides |
 | Packaged data | `~/.mcp-kali/share/plugins/` | `/usr/lib/mcp-kali/plugins/` | Read-only bundled Plugins, catalog, and references |
 | Active job state | `~/.mcp-kali/var/lib/jobs/` | `/var/lib/mcp-kali/jobs/` | Private job metadata, command records, and output |
-| Job archive | `~/.mcp-kali/var/lib/archive/jobs/` | `/var/lib/mcp-kali/archive/jobs/` | Recoverable terminal-job directories |
+| Job archive | `~/.mcp-kali/var/lib/archive/jobs/` | `/var/lib/mcp-kali/archive/jobs/` | Timestamp-windowed `.tar.gz` terminal-job archives |
 | Systemd unit | — | `/usr/lib/systemd/system/mcp-kali.service` | Generated service definition |
 
 Add its binary directory to `PATH` if necessary:
@@ -479,8 +479,8 @@ sudo systemctl kill --signal=SIGUSR1 mcp-kali.service
 sudo make archive-jobs-system
 ```
 
-The journal records the matched, archived, failed, and byte counts. Archived
-records are not deleted automatically.
+The journal records the matched, archived, failed, and byte counts, plus the
+created archive filename. Archived records are not deleted automatically.
 
 ### Remote client through SSH
 
@@ -928,8 +928,8 @@ rendered as text even when it contains tags, event handlers, or scripts.
 
 The Finished history tab includes **Archive finished jobs…**. Enter a positive
 whole number of minutes. The dashboard previews the number and approximate
-size, asks for confirmation, and then moves only terminal jobs old enough to
-the configured private archive directory. Successful jobs immediately
+size, asks for confirmation, and then compresses only terminal jobs old enough
+into the configured private archive directory. Successful jobs immediately
 disappear from history. No dashboard action permanently deletes an archive.
 
 ### Log download
@@ -979,15 +979,18 @@ Content-Type: application/json
 {"older_than_minutes":60}
 ```
 
-The response reports `matched`, `archived`, `failed`, `bytes_archived`, and any
-per-job failures. Only terminal jobs are eligible. The complete UUID directory
-is atomically moved to `MCP_KALI_JOB_ARCHIVE_DIR`, so successful jobs disappear
-from the live API and dashboard. Source and archive directories must be on the
-same filesystem.
+The response reports `matched`, `archived`, `failed`, `bytes_archived`, the
+optional `archive_file`, and any per-job failures. Only terminal jobs are
+eligible. Each terminal job carries a private `integrity.json` SHA-256 manifest
+covering its final `job.json`, `command.json`, and any stdout/stderr logs.
+Archiving verifies the manifest and writes the batch to
+`MCP_KALI_JOB_ARCHIVE_DIR/jobs_<oldest-start>_to_<newest-finish>_<count>.tar.gz`.
+Successful jobs disappear from the live API and dashboard. The source and
+archive directories do not need to share a filesystem.
 
 There is no automatic archive deletion. To restore a system archive, stop the
-service, move its UUID directory back into `/var/lib/mcp-kali/jobs`, and start
-the service so it reloads the record.
+service, verify and extract the required UUID directory from the `.tar.gz` into
+`/var/lib/mcp-kali/jobs`, then start the service so it reloads the record.
 
 ### Removed 1.1 submission endpoints
 
@@ -1212,6 +1215,7 @@ Each job directory contains:
 | `command.json` | Private executable argv and webhook destination | `600` |
 | `stdout.log` | Captured stdout | `600` |
 | `stderr.log` | Captured stderr | `600` |
+| `integrity.json` | SHA-256 manifest for final evidence files; written only once terminal | `600` |
 
 The directory uses mode `700`.
 

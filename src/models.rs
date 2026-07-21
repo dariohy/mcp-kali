@@ -92,6 +92,8 @@ pub struct JobArchiveResult {
     pub archived: usize,
     pub failed: usize,
     pub bytes_archived: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub archive_file: Option<String>,
     pub failures: Vec<JobArchiveFailure>,
 }
 
