@@ -3,7 +3,7 @@ use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::{Shell, generate};
 use mcp_kali::{
     config::{default_config_dir, default_state_dir, default_system_data_dir},
-    jobs::Scheduler,
+    jobs::{Scheduler, default_archive_root},
     plugins::{PluginRegistry, PrivilegeElevation},
     references::{ReferenceImport, import_reference},
 };
@@ -35,6 +35,14 @@ struct Cli {
         default_value_os_t = default_state_dir()
     )]
     state_dir: PathBuf,
+
+    /// Directory for recoverably archived terminal job records.
+    #[arg(long, env = "MCP_KALI_JOB_ARCHIVE_DIR", value_name = "PATH")]
+    job_archive_dir: Option<PathBuf>,
+
+    /// Archive terminal jobs at least this many minutes old when SIGUSR1 is received.
+    #[arg(long, env = "MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES", default_value_t = 60)]
+    job_archive_after_minutes: u64,
 
     /// Maximum scanner processes running at once.
     #[arg(long, env = "MCP_KALI_MAX_CONCURRENCY", default_value_t = 2)]
@@ -194,10 +202,15 @@ async fn main() -> Result<()> {
             "remote bind enabled; mcp-kali has no built-in authentication"
         );
     }
-    let scheduler = Scheduler::open_with_sensitive_data(
+    let job_archive_dir = cli
+        .job_archive_dir
+        .unwrap_or_else(|| default_archive_root(&cli.state_dir));
+    let scheduler = Scheduler::open_with_archive(
         cli.state_dir.clone(),
+        job_archive_dir,
         cli.max_concurrency,
         cli.default_timeout,
+        cli.job_archive_after_minutes,
         cli.reveal_sensitive_data,
     )
     .await?;
@@ -272,6 +285,11 @@ async fn signal_loop(
             shutdown.cancel();
             return;
         };
+        let Ok(mut archive) = signal(SignalKind::user_defined1()) else {
+            tracing::error!("could not register SIGUSR1 handler");
+            shutdown.cancel();
+            return;
+        };
         loop {
             tokio::select! {
                 _ = terminate.recv() => {
@@ -288,6 +306,20 @@ async fn signal_loop(
                 }
                 _ = reload.recv() => {
                     reload_runtime(&scheduler, &registry, &settings).await;
+                }
+                _ = archive.recv() => {
+                    let older_than_minutes = scheduler.archive_after_minutes();
+                    match scheduler.archive_terminal_jobs(older_than_minutes).await {
+                        Ok(result) => tracing::info!(
+                            older_than_minutes,
+                            matched = result.matched,
+                            archived = result.archived,
+                            failed = result.failed,
+                            bytes_archived = result.bytes_archived,
+                            "archived terminal jobs after SIGUSR1"
+                        ),
+                        Err(error) => tracing::error!(%error, "SIGUSR1 job archive failed"),
+                    }
                 }
                 _ = shutdown.cancelled() => return,
             }

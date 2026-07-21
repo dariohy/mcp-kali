@@ -7,6 +7,7 @@ INSTALL_DIR ?= $(MCP_KALI_HOME)/bin
 CONFIG_DIR ?= $(MCP_KALI_HOME)/etc
 DATA_DIR ?= $(MCP_KALI_HOME)/share
 STATE_DIR ?= $(MCP_KALI_HOME)/var/jobs
+ARCHIVE_DIR ?= $(MCP_KALI_HOME)/var/archive/jobs
 PLUGIN_DIR := $(DATA_DIR)/plugins
 REFERENCE_OVERLAY_DIR := $(CONFIG_DIR)/references
 CONFIG_FILE := $(CONFIG_DIR)/mcp-kali.conf
@@ -20,6 +21,7 @@ SYSTEM_DATA_DIR ?= /usr/lib/mcp-kali
 SYSTEM_PLUGIN_DIR := $(SYSTEM_DATA_DIR)/plugins
 SYSTEM_REFERENCE_OVERLAY_DIR := $(SYSTEM_CONFIG_DIR)/references
 SYSTEM_STATE_DIR ?= /var/lib/mcp-kali/jobs
+SYSTEM_ARCHIVE_DIR ?= /var/lib/mcp-kali/archive/jobs
 SYSTEMD_UNIT_DIR ?= /usr/lib/systemd/system
 MCP_KALI_USER ?= kali
 MCP_KALI_GROUP ?= $(MCP_KALI_USER)
@@ -29,7 +31,7 @@ SYSTEM_UNIT_FILE := $(SYSTEMD_UNIT_DIR)/mcp-kali.service
 .PHONY: help fmt fmt-check check clippy test build client release verify run-server run-client \
 	completions client-install install-local checksum security sbom clean \
 	install install-local install-system uninstall uninstall-local uninstall-system \
-	systemd-reload enable-system disable-system status-system logs-system
+	systemd-reload enable-system disable-system status-system logs-system archive-jobs-system
 
 help:
 	@echo "MCP Kali $(VERSION) development and release targets"
@@ -55,6 +57,7 @@ help:
 	@echo "  disable-system Disable and stop mcp-kali.service"
 	@echo "  status-system  Show mcp-kali.service status"
 	@echo "  logs-system    Follow mcp-kali.service journal logs"
+	@echo "  archive-jobs-system Send SIGUSR1 to archive terminal jobs older than the configured minute threshold"
 	@echo "  checksum      Generate target/release/SHA256SUMS"
 	@echo "  security      Run audit, dependency policy, and secret scan"
 	@echo "  sbom          Generate a CycloneDX JSON SBOM (cargo-cyclonedx required)"
@@ -119,7 +122,7 @@ install-local: release
 	@test "$$(id -u)" -ne 0 || { echo "install-local is for a non-root user; use make install MCP_KALI_USER=<authorized-user> as root" >&2; exit 2; }
 	mkdir -p "$(INSTALL_DIR)"
 	mkdir -p "$(PLUGIN_DIR)" "$(CONFIG_DIR)/plugins" "$(REFERENCE_OVERLAY_DIR)"
-	mkdir -p "$(STATE_DIR)"
+	mkdir -p "$(STATE_DIR)" "$(ARCHIVE_DIR)"
 	mkdir -p "$(LOCAL_BIN_DIR)"
 	@test -e "$(CONFIG_FILE)" || install -m 0644 "examples/mcp-kali.conf.example" "$(CONFIG_FILE)"
 	install -m 0755 "target/release/$(SERVER_BIN)" "$(INSTALL_DIR)/$(SERVER_BIN)"
@@ -170,16 +173,18 @@ uninstall-system:
 	rm -f "$(SYSTEM_UNIT_FILE)" "$(SYSTEM_BIN_DIR)/$(SERVER_BIN)" "$(SYSTEM_BIN_DIR)/$(CLIENT_BIN)"
 	@if command -v systemctl >/dev/null 2>&1; then systemctl daemon-reload; fi
 	rm -rf "$(SYSTEM_CONFIG_DIR)" "$(SYSTEM_DATA_DIR)" "$(SYSTEM_STATE_DIR)"
+	@echo "Preserved job archives under $(SYSTEM_ARCHIVE_DIR)"
 
 install-system: release
 	@test "$$(id -u)" -eq 0 || { echo "install-system must run as root" >&2; exit 2; }
+	@case "$(SYSTEM_ARCHIVE_DIR)" in */archive/jobs) :;; *) echo "refusing unsafe SYSTEM_ARCHIVE_DIR=$(SYSTEM_ARCHIVE_DIR); expected a path ending in /archive/jobs" >&2; exit 2;; esac
 	@case "$(MCP_KALI_USER)" in ""|*[!A-Za-z0-9_.-]*) echo "MCP_KALI_USER must be a simple account name" >&2; exit 2;; esac
 	@case "$(MCP_KALI_GROUP)" in ""|*[!A-Za-z0-9_.-]*) echo "MCP_KALI_GROUP must be a simple account name" >&2; exit 2;; esac
 	@id -u "$(MCP_KALI_USER)" >/dev/null 2>&1 || { echo "service user $(MCP_KALI_USER) does not exist; create or select an authorized account" >&2; exit 2; }
 	@getent group "$(MCP_KALI_GROUP)" >/dev/null 2>&1 || { echo "service group $(MCP_KALI_GROUP) does not exist" >&2; exit 2; }
 	@service_home="$$(getent passwd "$(MCP_KALI_USER)" | awk -F: 'NR == 1 { print $$6 }')"; test -n "$$service_home" && test -d "$$service_home" || { echo "service user $(MCP_KALI_USER) has no usable home directory" >&2; exit 2; }
 	install -d -m 0755 "$(SYSTEM_BIN_DIR)" "$(SYSTEM_PLUGIN_DIR)" "$(SYSTEM_CONFIG_DIR)/plugins" "$(SYSTEM_REFERENCE_OVERLAY_DIR)" "$(SYSTEMD_UNIT_DIR)"
-	install -d -o "$(MCP_KALI_USER)" -g "$(MCP_KALI_GROUP)" -m 0700 "$(SYSTEM_STATE_DIR)"
+	install -d -o "$(MCP_KALI_USER)" -g "$(MCP_KALI_GROUP)" -m 0700 "$(SYSTEM_STATE_DIR)" "$(SYSTEM_ARCHIVE_DIR)"
 	install -m 0755 "target/release/$(SERVER_BIN)" "$(SYSTEM_BIN_DIR)/$(SERVER_BIN)"
 	install -m 0755 "target/release/$(CLIENT_BIN)" "$(SYSTEM_BIN_DIR)/$(CLIENT_BIN)"
 	cp -R plugins/. "$(SYSTEM_PLUGIN_DIR)/"
@@ -203,6 +208,9 @@ status-system:
 
 logs-system:
 	journalctl -u mcp-kali.service -f
+
+archive-jobs-system:
+	systemctl kill --signal=SIGUSR1 mcp-kali.service
 
 checksum: release
 	cd target/release && shasum -a 256 "$(SERVER_BIN)" "$(CLIENT_BIN)" > SHA256SUMS

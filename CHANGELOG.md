@@ -7,6 +7,9 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ### Added
 
+- Recoverable terminal-job archiving through a previewed dashboard action,
+  REST endpoints, `SIGUSR1`, and `make archive-jobs-system`, with configurable
+  minute-based age and archive paths and no automatic archive deletion.
 - Layered validated Plugin reference documents, REST discovery, a Monitor
   References tab, and MCP `resources/list` / `resources/read` projection with
   list-change notifications.

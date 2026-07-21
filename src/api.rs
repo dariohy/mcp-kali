@@ -42,6 +42,8 @@ pub async fn serve(
         .route("/monitor", get(index))
         .route("/health", get(health))
         .route("/api/jobs", get(list_jobs))
+        .route("/api/jobs/archive/preview", get(preview_job_archive))
+        .route("/api/jobs/archive", post(archive_jobs))
         .route("/api/jobs/{id}", get(get_job))
         .route("/api/jobs/{id}/cancel", post(cancel))
         .route("/api/jobs/{id}/pause", post(pause))
@@ -91,6 +93,43 @@ impl From<anyhow::Error> for ApiError {
 
 async fn list_jobs(State(state): State<AppState>) -> Json<Value> {
     Json(json!({"jobs": state.scheduler.list().await}))
+}
+
+#[derive(Deserialize)]
+struct ArchivePreviewQuery {
+    older_than_minutes: Option<u64>,
+}
+
+#[derive(Deserialize)]
+struct ArchiveRequest {
+    older_than_minutes: u64,
+}
+
+async fn preview_job_archive(
+    State(state): State<AppState>,
+    Query(query): Query<ArchivePreviewQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let minutes = query
+        .older_than_minutes
+        .unwrap_or_else(|| state.scheduler.archive_after_minutes());
+    state
+        .scheduler
+        .preview_archive(minutes)
+        .await
+        .map(|preview| Json(json!(preview)))
+        .map_err(ApiError::from)
+}
+
+async fn archive_jobs(
+    State(state): State<AppState>,
+    Json(request): Json<ArchiveRequest>,
+) -> Result<Json<Value>, ApiError> {
+    state
+        .scheduler
+        .archive_terminal_jobs(request.older_than_minutes)
+        .await
+        .map(|result| Json(json!(result)))
+        .map_err(ApiError::from)
 }
 
 async fn get_job(

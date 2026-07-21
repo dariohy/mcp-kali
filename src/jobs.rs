@@ -1,4 +1,6 @@
-use crate::models::{Job, JobState, OutputPage, SubmitJob};
+use crate::models::{
+    Job, JobArchiveFailure, JobArchivePreview, JobArchiveResult, JobState, OutputPage, SubmitJob,
+};
 use anyhow::{Context, Result, anyhow, bail};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -30,8 +32,41 @@ const MAX_ARG_COUNT: usize = 1024;
 const MAX_ARG_BYTES: usize = 64 * 1024;
 const MAX_COMMAND_BYTES: usize = 256 * 1024;
 const MAX_TOOL_BYTES: usize = 128;
+const MAX_ARCHIVE_MINUTES: u64 = 10 * 365 * 24 * 60;
 const JOB_TERMINATION_GRACE: Duration = Duration::from_secs(5);
 const SHUTDOWN_TERMINATION_GRACE: Duration = Duration::from_secs(10);
+
+pub fn default_archive_root(job_root: &Path) -> PathBuf {
+    job_root
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join("archive/jobs")
+}
+
+fn validate_archive_minutes(minutes: u64) -> Result<()> {
+    if minutes == 0 || minutes > MAX_ARCHIVE_MINUTES {
+        bail!("older_than_minutes must be between 1 and {MAX_ARCHIVE_MINUTES}");
+    }
+    Ok(())
+}
+
+fn archive_cutoff(minutes: u64) -> Result<chrono::DateTime<Utc>> {
+    let minutes = i64::try_from(minutes).context("archive minute threshold is too large")?;
+    Ok(Utc::now() - chrono::Duration::minutes(minutes))
+}
+
+async fn job_directory_size(path: &Path) -> Result<u64> {
+    let mut entries = fs::read_dir(path)
+        .await
+        .with_context(|| format!("read job directory {}", path.display()))?;
+    let mut bytes = 0u64;
+    while let Some(entry) = entries.next_entry().await? {
+        if entry.file_type().await?.is_file() {
+            bytes = bytes.saturating_add(entry.metadata().await?.len());
+        }
+    }
+    Ok(bytes)
+}
 
 #[derive(Serialize, Deserialize)]
 struct PrivateJobSpec {
@@ -54,13 +89,16 @@ pub struct Scheduler {
 
 struct Inner {
     root: PathBuf,
+    archive_root: PathBuf,
     jobs: Mutex<HashMap<Uuid, Job>>,
+    archive_lock: Mutex<()>,
     cancellations: Mutex<HashMap<Uuid, CancellationToken>>,
     process_ids: Mutex<HashMap<Uuid, i32>>,
     dispatch: Mutex<DispatchState>,
     notify: Notify,
     accepting: AtomicBool,
     default_timeout: u64,
+    archive_after_minutes: u64,
     reveal_sensitive_data: bool,
     webhook_client: reqwest::Client,
 }
@@ -72,7 +110,16 @@ struct DispatchState {
 
 impl Scheduler {
     pub async fn open(root: PathBuf, max_concurrency: usize, default_timeout: u64) -> Result<Self> {
-        Self::open_with_sensitive_data(root, max_concurrency, default_timeout, false).await
+        let archive_root = default_archive_root(&root);
+        Self::open_with_archive(
+            root,
+            archive_root,
+            max_concurrency,
+            default_timeout,
+            60,
+            false,
+        )
+        .await
     }
 
     /// Starts a scheduler with explicit control over public command redaction.
@@ -83,20 +130,51 @@ impl Scheduler {
         default_timeout: u64,
         reveal_sensitive_data: bool,
     ) -> Result<Self> {
+        let archive_root = default_archive_root(&root);
+        Self::open_with_archive(
+            root,
+            archive_root,
+            max_concurrency,
+            default_timeout,
+            60,
+            reveal_sensitive_data,
+        )
+        .await
+    }
+
+    pub async fn open_with_archive(
+        root: PathBuf,
+        archive_root: PathBuf,
+        max_concurrency: usize,
+        default_timeout: u64,
+        archive_after_minutes: u64,
+        reveal_sensitive_data: bool,
+    ) -> Result<Self> {
         if max_concurrency == 0 {
             bail!("max_concurrency must be greater than zero");
+        }
+        validate_archive_minutes(archive_after_minutes)?;
+        if archive_root.as_os_str().is_empty() || archive_root.parent().is_none() {
+            bail!("job archive directory must not be empty or a filesystem root");
+        }
+        if archive_root == root || archive_root.starts_with(&root) {
+            bail!("job archive directory must be outside the active job state directory");
         }
         fs::create_dir_all(&root)
             .await
             .context("create job state directory")?;
         #[cfg(unix)]
-        fs::set_permissions(&root, std::os::unix::fs::PermissionsExt::from_mode(0o700))
-            .await
-            .context("secure job state directory")?;
+        {
+            fs::set_permissions(&root, std::os::unix::fs::PermissionsExt::from_mode(0o700))
+                .await
+                .context("secure job state directory")?;
+        }
         let scheduler = Self {
             inner: Arc::new(Inner {
                 root,
+                archive_root,
                 jobs: Mutex::new(HashMap::new()),
+                archive_lock: Mutex::new(()),
                 cancellations: Mutex::new(HashMap::new()),
                 process_ids: Mutex::new(HashMap::new()),
                 dispatch: Mutex::new(DispatchState {
@@ -106,6 +184,7 @@ impl Scheduler {
                 notify: Notify::new(),
                 accepting: AtomicBool::new(true),
                 default_timeout,
+                archive_after_minutes,
                 reveal_sensitive_data,
                 webhook_client: reqwest::Client::new(),
             }),
@@ -115,6 +194,112 @@ impl Scheduler {
         tokio::spawn(async move { dispatcher.dispatch().await });
         scheduler.inner.notify.notify_one();
         Ok(scheduler)
+    }
+
+    pub fn archive_after_minutes(&self) -> u64 {
+        self.inner.archive_after_minutes
+    }
+
+    pub async fn preview_archive(&self, older_than_minutes: u64) -> Result<JobArchivePreview> {
+        validate_archive_minutes(older_than_minutes)?;
+        let cutoff = archive_cutoff(older_than_minutes)?;
+        let candidates = self.archive_candidates(cutoff).await;
+        let mut bytes = 0u64;
+        for id in &candidates {
+            bytes = bytes.saturating_add(job_directory_size(&self.job_dir(*id)).await?);
+        }
+        Ok(JobArchivePreview {
+            older_than_minutes,
+            cutoff,
+            matched: candidates.len(),
+            bytes,
+        })
+    }
+
+    pub async fn archive_terminal_jobs(&self, older_than_minutes: u64) -> Result<JobArchiveResult> {
+        validate_archive_minutes(older_than_minutes)?;
+        let _archive_guard = self.inner.archive_lock.lock().await;
+        fs::create_dir_all(&self.inner.archive_root)
+            .await
+            .context("create job archive directory")?;
+        #[cfg(unix)]
+        fs::set_permissions(
+            &self.inner.archive_root,
+            std::os::unix::fs::PermissionsExt::from_mode(0o700),
+        )
+        .await
+        .context("secure job archive directory")?;
+        let cutoff = archive_cutoff(older_than_minutes)?;
+        let candidates = self.archive_candidates(cutoff).await;
+        let matched = candidates.len();
+        let mut archived = 0usize;
+        let mut bytes_archived = 0u64;
+        let mut failures = Vec::new();
+
+        for id in candidates {
+            let source = self.job_dir(id);
+            let destination = self.inner.archive_root.join(id.to_string());
+            let bytes = match job_directory_size(&source).await {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    failures.push(JobArchiveFailure {
+                        job_id: id,
+                        error: error.to_string(),
+                    });
+                    continue;
+                }
+            };
+            if fs::try_exists(&destination).await? {
+                failures.push(JobArchiveFailure {
+                    job_id: id,
+                    error: "archive destination already exists".into(),
+                });
+                continue;
+            }
+            match fs::rename(&source, &destination).await {
+                Ok(()) => {
+                    self.inner.jobs.lock().await.remove(&id);
+                    archived += 1;
+                    bytes_archived = bytes_archived.saturating_add(bytes);
+                }
+                Err(error) => failures.push(JobArchiveFailure {
+                    job_id: id,
+                    error: error.to_string(),
+                }),
+            }
+        }
+
+        for failure in &failures {
+            warn!(
+                id = %failure.job_id,
+                error = %failure.error,
+                "could not archive terminal job"
+            );
+        }
+
+        Ok(JobArchiveResult {
+            older_than_minutes,
+            cutoff,
+            matched,
+            archived,
+            failed: failures.len(),
+            bytes_archived,
+            failures,
+        })
+    }
+
+    async fn archive_candidates(&self, cutoff: chrono::DateTime<Utc>) -> Vec<Uuid> {
+        self.inner
+            .jobs
+            .lock()
+            .await
+            .values()
+            .filter(|job| {
+                job.state.is_terminal()
+                    && job.finished_at.is_some_and(|finished| finished <= cutoff)
+            })
+            .map(|job| job.id)
+            .collect()
     }
 
     async fn load(&self) -> Result<()> {
@@ -882,6 +1067,81 @@ mod tests {
             assert_eq!(mode(&scheduler.job_dir(job.id).join("stdout.log")), 0o600);
             assert_eq!(mode(&scheduler.job_dir(job.id).join("stderr.log")), 0o600);
         }
+    }
+
+    #[tokio::test]
+    async fn archives_only_old_terminal_jobs_and_preserves_evidence() {
+        let temp = tempfile::tempdir().unwrap();
+        let job_root = temp.path().join("jobs");
+        let archive_root = temp.path().join("archive/jobs");
+        let scheduler =
+            Scheduler::open_with_archive(job_root.clone(), archive_root.clone(), 1, 10, 60, false)
+                .await
+                .unwrap();
+        let terminal = scheduler
+            .submit(SubmitJob {
+                tool: None,
+                argv: vec!["printf".into(), "archive-me".into()],
+                timeout_seconds: None,
+                webhook_url: None,
+            })
+            .await
+            .unwrap();
+        for _ in 0..100 {
+            if scheduler
+                .get(terminal.id)
+                .await
+                .unwrap()
+                .state
+                .is_terminal()
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        {
+            let mut jobs = scheduler.inner.jobs.lock().await;
+            let job = jobs.get_mut(&terminal.id).unwrap();
+            job.finished_at = Some(Utc::now() - chrono::Duration::minutes(2));
+            persist_at(&job_root, job).await.unwrap();
+        }
+
+        let active = scheduler
+            .submit(SubmitJob {
+                tool: None,
+                argv: vec!["sleep".into(), "1".into()],
+                timeout_seconds: None,
+                webhook_url: None,
+            })
+            .await
+            .unwrap();
+        for _ in 0..100 {
+            if scheduler.get(active.id).await.unwrap().state == JobState::Running {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        let preview = scheduler.preview_archive(1).await.unwrap();
+        assert_eq!(preview.matched, 1);
+        assert!(preview.bytes > 0);
+        let result = scheduler.archive_terminal_jobs(1).await.unwrap();
+        assert_eq!(result.matched, 1);
+        assert_eq!(result.archived, 1);
+        assert_eq!(result.failed, 0);
+        assert!(result.bytes_archived > 0);
+        assert!(scheduler.get(terminal.id).await.is_none());
+        assert!(scheduler.get(active.id).await.is_some());
+        assert!(!job_root.join(terminal.id.to_string()).exists());
+        let archived = archive_root.join(terminal.id.to_string());
+        assert!(archived.join("job.json").is_file());
+        assert!(archived.join("command.json").is_file());
+        assert!(archived.join("stdout.log").is_file());
+        assert!(archived.join("stderr.log").is_file());
+        assert!(scheduler.preview_archive(0).await.is_err());
+
+        scheduler.cancel(active.id).await.unwrap();
+        scheduler.shutdown().await;
     }
 
     #[tokio::test]

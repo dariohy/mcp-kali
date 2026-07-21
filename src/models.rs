@@ -71,6 +71,31 @@ pub struct OutputPage {
 }
 
 #[derive(Debug, Serialize)]
+pub struct JobArchivePreview {
+    pub older_than_minutes: u64,
+    pub cutoff: DateTime<Utc>,
+    pub matched: usize,
+    pub bytes: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct JobArchiveFailure {
+    pub job_id: Uuid,
+    pub error: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct JobArchiveResult {
+    pub older_than_minutes: u64,
+    pub cutoff: DateTime<Utc>,
+    pub matched: usize,
+    pub archived: usize,
+    pub failed: usize,
+    pub bytes_archived: u64,
+    pub failures: Vec<JobArchiveFailure>,
+}
+
+#[derive(Debug, Serialize)]
 pub struct Health {
     pub status: &'static str,
     pub service: &'static str,

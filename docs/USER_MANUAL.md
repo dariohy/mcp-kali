@@ -306,6 +306,8 @@ messages. The binaries already direct tracing to stderr.
 |---|---|---|---|
 | `MCP_KALI_BIND` | `--bind` | `127.0.0.1:5000` | Valid socket address |
 | `MCP_KALI_STATE_DIR` | `--state-dir` | `~/.mcp-kali/var/jobs` | Writable path |
+| `MCP_KALI_JOB_ARCHIVE_DIR` | `--job-archive-dir` | `~/.mcp-kali/var/archive/jobs` | Writable archive path outside the active state directory |
+| `MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES` | `--job-archive-after-minutes` | `60` | 1–5256000 minutes |
 | `MCP_KALI_MAX_CONCURRENCY` | `--max-concurrency` | `2` | 1–256 |
 | `MCP_KALI_DEFAULT_TIMEOUT` | `--default-timeout` | `1800` | 1–604800 seconds |
 | `MCP_KALI_REVEAL_SENSITIVE_DATA` | `--reveal-sensitive-data` | `false` | Boolean |
@@ -402,8 +404,9 @@ account by default. Override it for another existing account, for example
 
 The root-only installer places binaries in `/usr/local/bin`, immutable Plugin,
 catalog, and reference data in `/usr/lib/mcp-kali`, state in
-`/var/lib/mcp-kali/jobs`, administrator configuration in `/etc/mcp-kali`, and
-the rendered unit at `/usr/lib/systemd/system/mcp-kali.service`. It refuses to
+`/var/lib/mcp-kali/jobs`, administrator configuration in `/etc/mcp-kali`,
+recoverable terminal-job archives in `/var/lib/mcp-kali/archive/jobs`, and the
+rendered unit at `/usr/lib/systemd/system/mcp-kali.service`. It refuses to
 create or guess the service user, and it does not enable the service
 automatically. Review the generated configuration and sudoers policy first.
 Use `make status-system` and `make logs-system` after enablement.
@@ -441,6 +444,18 @@ When `MCP_KALI_MAX_CONCURRENCY` is set in the loaded configuration file,
 `SIGHUP` also applies its updated value. Increasing it dispatches queued work;
 decreasing it lets existing jobs finish and waits before starting more. An
 explicit CLI flag or inherited environment value remains fixed until restart.
+
+`SIGUSR1` archives terminal jobs finished at least
+`MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES` ago. The configured value is startup-only.
+Queued, running, and paused jobs are never selected. Use either command:
+
+```bash
+sudo systemctl kill --signal=SIGUSR1 mcp-kali.service
+sudo make archive-jobs-system
+```
+
+The journal records the matched, archived, failed, and byte counts. Archived
+records are not deleted automatically.
 
 ### Remote client through SSH
 
@@ -884,6 +899,14 @@ rendered as text even when it contains tags, event handlers, or scripts.
 - Open job details remain open.
 - Unchanged job-list markup is retained to reduce visual flicker.
 
+### Archive finished jobs
+
+The Finished history tab includes **Archive finished jobs…**. Enter a positive
+whole number of minutes. The dashboard previews the number and approximate
+size, asks for confirmation, and then moves only terminal jobs old enough to
+the configured private archive directory. Successful jobs immediately
+disappear from history. No dashboard action permanently deletes an archive.
+
 ### Log download
 
 Use `⇩ all` beside stdout or stderr. Running-job downloads contain all bytes
@@ -909,6 +932,37 @@ Example response:
   "max_concurrency": 2
 }
 ```
+
+### Job archive
+
+Preview terminal jobs finished at least 60 minutes ago:
+
+```text
+GET /api/jobs/archive/preview?older_than_minutes=60
+```
+
+The response includes `older_than_minutes`, the UTC `cutoff`, `matched`, and an
+approximate `bytes` count. Omitting the query uses
+`MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES`.
+
+Archive the previewed age range:
+
+```text
+POST /api/jobs/archive
+Content-Type: application/json
+
+{"older_than_minutes":60}
+```
+
+The response reports `matched`, `archived`, `failed`, `bytes_archived`, and any
+per-job failures. Only terminal jobs are eligible. The complete UUID directory
+is atomically moved to `MCP_KALI_JOB_ARCHIVE_DIR`, so successful jobs disappear
+from the live API and dashboard. Source and archive directories must be on the
+same filesystem.
+
+There is no automatic archive deletion. To restore a system archive, stop the
+service, move its UUID directory back into `/var/lib/mcp-kali/jobs`, and start
+the service so it reloads the record.
 
 ### Removed 1.1 submission endpoints
 
@@ -1603,6 +1657,8 @@ material. The upstream MIT terms and GPL-3.0-or-later are compatible.
 | GET | `/` or `/monitor` | Dashboard |
 | GET | `/health` | Health/version/queue depth |
 | GET | `/api/jobs` | List jobs |
+| GET | `/api/jobs/archive/preview` | Preview terminal jobs eligible for archiving |
+| POST | `/api/jobs/archive` | Recoverably archive eligible terminal jobs |
 | GET | `/api/jobs/{id}` | One job |
 | GET | `/api/jobs/{id}/output` | Bounded output page |
 | GET | `/api/jobs/{id}/tail` | Recent lines |

@@ -16,6 +16,7 @@ WorkingDirectory=@MCP_KALI_HOME@
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ExecStart=@MCP_KALI_BIN@ --config-file @MCP_KALI_CONFIG_FILE@ --system-data-dir @MCP_KALI_SYSTEM_DATA_DIR@ --config-dir @MCP_KALI_CONFIG_DIR@
 ExecReload=/bin/kill -HUP $MAINPID
+# SIGUSR1 recoverably archives terminal jobs older than the configured minute threshold.
 Restart=on-failure
 RestartSec=2s
 TimeoutStopSec=15s

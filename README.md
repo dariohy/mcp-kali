@@ -135,7 +135,8 @@ uses a separate, explicit workflow.
 To remove an installation, use `make uninstall`. As a regular user, it removes
 the selected `MCP_KALI_HOME` tree and only matching `~/.local/bin` symlinks. As
 root, it stops and disables `mcp-kali.service`, then removes the system
-binaries, configuration, and durable job state.
+binaries, configuration, and active durable job state. Recoverable system job
+archives are preserved for the administrator.
 
 ### Systemd installation (Kali/Linux)
 
@@ -157,11 +158,12 @@ remain available when automation needs to force a mode.
 
 The system install places binaries under `/usr/local/bin`, immutable Plugin,
 catalog, and reference data under `/usr/lib/mcp-kali`, administrator overlays
-under `/etc/mcp-kali`, private state under `/var/lib/mcp-kali/jobs`, and the
-generated unit at `/usr/lib/systemd/system/mcp-kali.service`. Review the
-configuration and sudoers policy before enabling it. Use `make status-system`
-and `make logs-system` for operations; `systemctl reload mcp-kali` maps to
-`SIGHUP`. The service runs from the selected service user's home directory;
+under `/etc/mcp-kali`, private state under `/var/lib/mcp-kali/jobs`, recoverable
+archives under `/var/lib/mcp-kali/archive/jobs`, and the generated unit at
+`/usr/lib/systemd/system/mcp-kali.service`. Review the configuration and
+sudoers policy before enabling it. Use `make status-system`, `make logs-system`,
+and `make archive-jobs-system` for operations; `systemctl reload mcp-kali` maps
+to `SIGHUP`. The service runs from the selected service user's home directory;
 standalone runs retain the invoking shell's working directory.
 
 When no `--config-file` or `MCP_KALI_CONFIG_FILE` is selected, MCP Kali uses
@@ -240,6 +242,8 @@ not accept the prior `--env-file` / `MCP_KALI_ENV_FILE` selectors.
 | `RUST_LOG` | Both | Binary-specific info filter | Tracing filter; logs go to stderr |
 | `MCP_KALI_BIND` | Server | `127.0.0.1:5000` | HTTP API/dashboard bind address |
 | `MCP_KALI_STATE_DIR` | Server | `~/.mcp-kali/var/jobs` | Private durable job directory |
+| `MCP_KALI_JOB_ARCHIVE_DIR` | Server | `~/.mcp-kali/var/archive/jobs` | Private recoverable archive for terminal jobs |
+| `MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES` | Server | `60` | Minimum terminal-job age used by `SIGUSR1`, range 1–5256000 minutes |
 | `MCP_KALI_MAX_CONCURRENCY` | Server | `2` | Simultaneous jobs, range 1–256 |
 | `MCP_KALI_DEFAULT_TIMEOUT` | Server | `1800` | Default wall timeout, range 1–604800 seconds |
 | `MCP_KALI_REVEAL_SENSITIVE_DATA` | Server | `false` | Show unredacted commands in public records |
@@ -371,6 +375,10 @@ drains naturally; a higher limit starts queued jobs immediately. A reload with
 configuration, Plugin, or reference diagnostics retains the prior runtime.
 Send a second `SIGTERM` (or `SIGINT`) to skip the grace period and immediately
 force-kill active job process groups.
+`SIGUSR1` archives terminal jobs whose finish time is at least
+`MCP_KALI_JOB_ARCHIVE_AFTER_MINUTES` old. It never touches queued, running, or
+paused jobs. For a system installation, `sudo make archive-jobs-system` sends
+this signal and the service journal records the result.
 The always-available job Plugin exposes listing, status, output paging, cancel,
 pause, resume, force-kill, and health operations. Every tool response is wrapped
 in an `untrusted_job_execution_data` envelope. Job
@@ -389,6 +397,7 @@ The dashboard provides:
 - queue order, state, tool, command summary, and elapsed time;
 - a left-edge `>` control that expands full metadata and wrapped command text;
 - pause, resume, remove, and force-kill controls where applicable;
+- previewed, confirmed archiving of terminal jobs by age in minutes;
 - escaped last-50-line stdout/stderr views and complete-log downloads;
 - manual refresh and five-second opt-in auto-refresh, stopped by default.
 
@@ -403,6 +412,12 @@ STATE_DIR/<job-uuid>/command.json
 STATE_DIR/<job-uuid>/stdout.log
 STATE_DIR/<job-uuid>/stderr.log
 ```
+
+Archiving atomically moves the complete directory out of the active index and
+into `JOB_ARCHIVE_DIR/<job-uuid>/`. Archived jobs disappear from the API and
+dashboard but retain their metadata, private execution specification, and
+output. MCP Kali does not automatically delete archived evidence; retention is
+an administrator policy.
 
 On Unix, job directories use mode `700`; files use mode `600`. These artifacts
 may contain sensitive pentest evidence and must be protected and retained or
