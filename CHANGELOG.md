@@ -24,6 +24,9 @@ All notable changes to MCP Kali are documented here. The project follows
   while retaining the seven-day maximum.
 - Consolidate configuration into a ready-to-run `mcp-kali.conf` and a sibling
   `mcp-kali.conf.example` reference with `RUST_LOG` guidance and safe limits.
+- Restore the canonical `.conf` filenames after an early 2.3.0 `.config`
+  mistake; installation migrates the active file and removes the obsolete
+  reference file.
 
 ## [2.2.1] - 2026-07-21
 

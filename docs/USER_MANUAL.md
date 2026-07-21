@@ -460,6 +460,11 @@ Without an explicit `--config-file`, the binaries use
 per-user `~/.mcp-kali/etc/mcp-kali.conf` fallback. The accidental `.config`
 paths are consulted only when neither canonical file exists.
 
+Early 2.3.0 builds briefly used the wrong `.config` filename. Rerun `make
+install` as the installation owner to rename an existing `mcp-kali.config` to
+`mcp-kali.conf` and remove `mcp-kali.config.example`; the installation then
+contains only `mcp-kali.conf` and `mcp-kali.conf.example`.
+
 ### Runtime signals
 
 On Unix, use `SIGTERM` (or `SIGINT`) for graceful shutdown. The server stops

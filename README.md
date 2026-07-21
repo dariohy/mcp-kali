@@ -179,6 +179,10 @@ Without `--config-file`, MCP Kali uses
 the per-user `~/.mcp-kali/etc/mcp-kali.conf` lookup. The accidental `.config`
 name is used only as a migration fallback when neither canonical `.conf` file exists.
 
+If an early 2.3.0 installation created `mcp-kali.config`, rerun `make install`
+as the installation owner. The installer renames it to `mcp-kali.conf`, removes
+the obsolete `.config.example`, and leaves the canonical two-file layout.
+
 Release builds use size optimization, full LTO, one codegen unit, stripped
 symbols, and abort-on-panic behavior. No scheduler, API, dashboard, or MCP
 functionality is removed.
