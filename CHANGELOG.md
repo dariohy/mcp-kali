@@ -5,6 +5,8 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-07-22
+
 ### Added
 
 - Source-only Apple Silicon connector packaging for Codex and Claude Desktop,
@@ -298,7 +300,8 @@ All notable changes to MCP Kali are documented here. The project follows
 - There is no automatic job-retention policy; operators must manage the private
   state directory according to their evidence-retention requirements.
 
-[Unreleased]: https://github.com/dariohy/mcp-kali/compare/v2.3.1...HEAD
+[Unreleased]: https://github.com/dariohy/mcp-kali/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/dariohy/mcp-kali/compare/v2.3.1...v2.4.0
 [2.3.1]: https://github.com/dariohy/mcp-kali/compare/v2.2.1...v2.3.1
 [2.2.1]: https://github.com/dariohy/mcp-kali/compare/v2.1.1...v2.2.1
 [2.1.1]: https://github.com/dariohy/mcp-kali/releases/tag/v2.1.1

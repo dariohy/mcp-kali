@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "mcp-kali",
   "display_name": "MCP Kali",
-  "version": "2.3.1",
+  "version": "2.4.0",
   "description": "Connect Claude Desktop to an operator-managed MCP Kali server.",
   "long_description": "Runs the Apple Silicon MCP Kali bridge locally and connects it to an MCP Kali server over loopback, an SSH tunnel, or HTTPS.",
   "author": {
