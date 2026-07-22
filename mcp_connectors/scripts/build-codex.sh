@@ -5,7 +5,7 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd -P)
 SOURCE_ROOT="$REPO_ROOT/mcp_connectors/codex"
 MCP_KALI_HOME=${MCP_KALI_HOME:-$HOME/.mcp-kali}
-OUTPUT_ROOT=${CODEX_CONNECTOR_DIR:-$MCP_KALI_HOME/codex}
+OUTPUT_ROOT=${CODEX_CONNECTOR_DIR:-$MCP_KALI_HOME/plugins/codex}
 SOURCE_MCP="$SOURCE_ROOT/plugins/mcp-kali/.mcp.json"
 OUTPUT_MCP="$OUTPUT_ROOT/plugins/mcp-kali/.mcp.json"
 
@@ -46,8 +46,8 @@ if [ "$source_version" != "$expected_version" ]; then
   exit 2
 fi
 
-if [ "$OUTPUT_ROOT" != "$MCP_KALI_HOME/codex" ]; then
-  echo "Codex connector output must be $MCP_KALI_HOME/codex" >&2
+if [ "$OUTPUT_ROOT" != "$MCP_KALI_HOME/plugins/codex" ]; then
+  echo "Codex connector output must be $MCP_KALI_HOME/plugins/codex" >&2
   exit 2
 fi
 

@@ -26,8 +26,8 @@ absolute path:
 make connector-codex
 ```
 
-The result is `~/.mcp-kali/codex`. Build it and install the `mcp-kali` plugin
-through the Codex executable bundled with ChatGPT:
+The result is `~/.mcp-kali/plugins/codex`. Build it and install the `mcp-kali`
+plugin through the Codex executable bundled with ChatGPT:
 
 ```bash
 make connector-codex-install

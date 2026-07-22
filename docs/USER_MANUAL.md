@@ -572,8 +572,9 @@ For Apple Silicon Codex and Claude Desktop packaging, see
 [`mcp_connectors/README.md`](../mcp_connectors/README.md). The committed
 connector definitions are source-only. Their builders use the installed
 `~/.mcp-kali/bin/mcp-kali-bridge`, verify its version against `Cargo.toml`, and
-reject other architectures. Codex output is generated at `~/.mcp-kali/codex`;
-the Claude Desktop bundle is `~/.mcp-kali/plugins/mcp-kali.mcpb`.
+reject other architectures. Codex output is generated at
+`~/.mcp-kali/plugins/codex`; the Claude Desktop bundle is
+`~/.mcp-kali/plugins/mcp-kali.mcpb`.
 
 ### Protocol behavior
 

@@ -6,9 +6,9 @@ VERSION := $(shell awk -F '"' '/^version = / { print $$2; exit }' Cargo.toml)
 MCP_KALI_HOME ?= $(HOME)/.mcp-kali
 INSTALL_DIR ?= $(MCP_KALI_HOME)/bin
 MCP_KALI_BRIDGE_PATH ?= $(INSTALL_DIR)/$(CLIENT_BIN)
-CODEX_CONNECTOR_DIR ?= $(MCP_KALI_HOME)/codex
-CLAUDE_PLUGIN_DIR ?= $(MCP_KALI_HOME)/plugins
-CLAUDE_CONNECTOR_FILE ?= $(CLAUDE_PLUGIN_DIR)/mcp-kali.mcpb
+CONNECTOR_DIR ?= $(MCP_KALI_HOME)/plugins
+CODEX_CONNECTOR_DIR ?= $(CONNECTOR_DIR)/codex
+CLAUDE_CONNECTOR_FILE ?= $(CONNECTOR_DIR)/mcp-kali.mcpb
 CODEX_CLI ?= /Applications/ChatGPT.app/Contents/Resources/codex
 CONFIG_DIR ?= $(MCP_KALI_HOME)/etc
 DATA_DIR ?= $(MCP_KALI_HOME)/share
@@ -67,7 +67,7 @@ help:
 	@echo "  client-install Build and locally install only mcp-kali-bridge"
 	@echo "  connectors    Build Codex and Claude Desktop connectors for Apple Silicon"
 	@echo "  connectors-check Validate connector source manifests and the bundled skill"
-	@echo "  connector-codex Prepare a Codex plugin marketplace under ~/.mcp-kali/codex"
+	@echo "  connector-codex Prepare a Codex marketplace under ~/.mcp-kali/plugins/codex"
 	@echo "  connector-codex-install Build and install the Codex plugin through ChatGPT's bundled CLI"
 	@echo "  connector-claude-desktop Build ~/.mcp-kali/plugins/mcp-kali.mcpb"
 	@echo "  install       Install locally as a user, or system-wide as root"
