@@ -82,12 +82,12 @@ fn migrate_legacy_bridge_environment() {
 }
 
 fn migrate_legacy_environment(legacy: &str, canonical: &str) {
-    if env::var_os(canonical).is_none()
-        && let Some(value) = env::var_os(legacy)
-    {
-        // SAFETY: called during single-threaded startup before the Tokio
-        // runtime or any application threads are created.
-        unsafe { env::set_var(canonical, value) };
+    if env::var_os(canonical).is_none() {
+        if let Some(value) = env::var_os(legacy) {
+            // SAFETY: called during single-threaded startup before the Tokio
+            // runtime or any application threads are created.
+            unsafe { env::set_var(canonical, value) };
+        }
     }
 }
 

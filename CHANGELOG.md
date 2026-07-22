@@ -5,7 +5,7 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ## [Unreleased]
 
-## [2.3.0] - 2026-07-21
+## [2.3.1] - 2026-07-21
 
 ### Added
 
@@ -32,6 +32,13 @@ All notable changes to MCP Kali are documented here. The project follows
 - Restore the canonical `.conf` filenames after an early 2.3.0 `.config`
   mistake; installation migrates the active file and removes the obsolete
   reference file.
+
+### Fixed
+
+- Restore compatibility with the declared Rust 1.86 minimum by avoiding a
+  let-chain in the bridge's legacy environment-variable migration.
+- Run the Rust 1.86 CI verification on current and future `2.x` release
+  branches instead of waiting until changes reach `main`.
 
 ## [2.2.1] - 2026-07-21
 
@@ -281,8 +288,8 @@ All notable changes to MCP Kali are documented here. The project follows
 - There is no automatic job-retention policy; operators must manage the private
   state directory according to their evidence-retention requirements.
 
-[Unreleased]: https://github.com/dariohy/mcp-kali/compare/v2.3.0...HEAD
-[2.3.0]: https://github.com/dariohy/mcp-kali/compare/v2.2.1...v2.3.0
+[Unreleased]: https://github.com/dariohy/mcp-kali/compare/v2.3.1...HEAD
+[2.3.1]: https://github.com/dariohy/mcp-kali/compare/v2.2.1...v2.3.1
 [2.2.1]: https://github.com/dariohy/mcp-kali/compare/v2.1.1...v2.2.1
 [2.1.1]: https://github.com/dariohy/mcp-kali/releases/tag/v2.1.1
 [2.0.0]: https://github.com/dariohy/mcp-kali/releases/tag/v2.0.0
