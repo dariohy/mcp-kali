@@ -1,0 +1,4 @@
+interface:
+  display_name: "MCP Kali"
+  short_description: "Run authorized Kali security workflows"
+  default_prompt: "Use $use-mcp-kali to run an authorized security workflow and monitor its jobs safely."

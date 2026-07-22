@@ -1,0 +1,53 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/mcpb/main/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
+  "name": "mcp-kali",
+  "display_name": "MCP Kali",
+  "version": "2.3.1",
+  "description": "Connect Claude Desktop to an operator-managed MCP Kali server.",
+  "long_description": "Runs the Apple Silicon MCP Kali bridge locally and connects it to an MCP Kali server over loopback, an SSH tunnel, or HTTPS.",
+  "author": {
+    "name": "dariohy",
+    "url": "https://github.com/dariohy"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dariohy/mcp-kali.git"
+  },
+  "homepage": "https://github.com/dariohy/mcp-kali",
+  "documentation": "https://github.com/dariohy/mcp-kali/blob/main/docs/USER_MANUAL.md",
+  "support": "https://github.com/dariohy/mcp-kali/issues",
+  "server": {
+    "type": "binary",
+    "entry_point": "server/mcp-kali-bridge",
+    "mcp_config": {
+      "command": "${__dirname}/server/mcp-kali-bridge",
+      "env": {
+        "MCP_KALI_BRIDGE_SERVER": "${user_config.server_url}",
+        "MCP_KALI_BRIDGE_ALLOW_INSECURE_HTTP": "${user_config.allow_insecure_http}"
+      }
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin"]
+  },
+  "user_config": {
+    "server_url": {
+      "type": "string",
+      "title": "MCP Kali server URL",
+      "description": "Use loopback through an SSH tunnel or an authenticated HTTPS origin when possible.",
+      "required": true,
+      "default": "http://127.0.0.1:5000"
+    },
+    "allow_insecure_http": {
+      "type": "boolean",
+      "title": "Allow remote cleartext HTTP",
+      "description": "Permit HTTP to a non-loopback server. Enable only for an isolated authorized lab.",
+      "required": false,
+      "default": false
+    }
+  },
+  "tools_generated": true,
+  "keywords": ["kali", "mcp", "security", "pentesting"],
+  "license": "GPL-3.0-or-later"
+}

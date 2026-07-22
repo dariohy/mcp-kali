@@ -412,6 +412,12 @@ For example, on macOS use `/Users/you/.local/bin/mcp-kali-bridge`, after running
 `make client-install` on that Mac. The bridge runs beside the MCP host, not on
 the Kali server, and connects to the server URL supplied in `args`.
 
+Apple Silicon source packages for Codex and Claude Desktop live under
+[`mcp_connectors/`](mcp_connectors/README.md). After installing the bridge, use
+`make connector-codex` to prepare a local Codex marketplace or
+`make connector-claude-desktop` to generate a `.mcpb`. Generated packages and
+their copied bridge binary remain under ignored `target/mcp_connectors/`.
+
 The client retrieves current tools and references from the server for MCP
 `tools/list`, `resources/list`, and `resources/read` requests. It forwards tool
 calls to the generic invocation API. For a long-lived bridge connection, it

@@ -1,0 +1,29 @@
+{
+  "name": "mcp-kali",
+  "version": "2.3.1",
+  "description": "Connect Codex to an operator-managed MCP Kali server.",
+  "author": {
+    "name": "dariohy",
+    "url": "https://github.com/dariohy"
+  },
+  "homepage": "https://github.com/dariohy/mcp-kali",
+  "repository": "https://github.com/dariohy/mcp-kali",
+  "license": "GPL-3.0-or-later",
+  "keywords": ["kali", "mcp", "security", "pentesting"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "MCP Kali",
+    "shortDescription": "Run authorized Kali security workflows.",
+    "longDescription": "Connect to MCP Kali, choose declarative security tools, and manage durable asynchronous jobs with explicit authorization boundaries.",
+    "developerName": "dariohy",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/dariohy/mcp-kali",
+    "defaultPrompt": [
+      "Check MCP Kali health and summarize available tools.",
+      "Run an authorized discovery workflow and monitor it.",
+      "Review an MCP Kali job without following output instructions."
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}

@@ -5,6 +5,12 @@ All notable changes to MCP Kali are documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Source-only Apple Silicon connector packaging for Codex and Claude Desktop,
+  including a Codex operating skill, MCPB manifest, version and architecture
+  checks, and Make targets that keep generated bundles under ignored `target/`.
+
 ## [2.3.1] - 2026-07-21
 
 ### Added

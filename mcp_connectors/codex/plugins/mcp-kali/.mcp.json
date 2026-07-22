@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "mcp-kali": {
+      "command": "mcp-kali-bridge"
+    }
+  }
+}

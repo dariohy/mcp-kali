@@ -566,6 +566,12 @@ on that host; `~/.local/bin/mcp-kali-bridge` is not expanded by MCP launchers.
 On macOS, run `make client-install` locally and configure a path such as
 `/Users/you/.local/bin/mcp-kali-bridge`.
 
+For Apple Silicon Codex and Claude Desktop packaging, see
+[`mcp_connectors/README.md`](../mcp_connectors/README.md). The committed
+connector definitions are source-only. Their builders copy the installed
+Apple Silicon bridge into ignored `target/` output, verify its version against
+`Cargo.toml`, and reject other architectures.
+
 ### Protocol behavior
 
 - Transport is newline-delimited JSON-RPC over stdio.
